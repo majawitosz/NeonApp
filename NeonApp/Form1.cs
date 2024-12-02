@@ -217,13 +217,18 @@ namespace NeonApp
 
         private void ApplyGlowEffect(Bitmap edges, Bitmap result, Color glowColor)
         {
-            BitmapData edgesData = edges.LockBits(new Rectangle(0, 0, edges.Width, edges.Height),
-         ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
-            BitmapData resultData = result.LockBits(new Rectangle(0, 0, result.Width, result.Height),
-                ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
-            double baseAlpha = 40.0;      // Reduced intensity
-            double distanceScale = 4.0;    // Larger fade distance
-            int glowRadius = 6;           // Increased glow radius
+            BitmapData edgesData = edges.LockBits(
+                new Rectangle(0, 0, edges.Width, edges.Height),
+                ImageLockMode.ReadOnly,
+                PixelFormat.Format32bppArgb);
+
+            BitmapData resultData = result.LockBits(
+                new Rectangle(0, 0, result.Width, result.Height),
+                ImageLockMode.WriteOnly,
+                PixelFormat.Format32bppArgb);
+
+            Color whiteGlowColor = Color.White;
+
             try
             {
                 unsafe
@@ -233,50 +238,42 @@ namespace NeonApp
                     int stride = edgesData.Stride;
                     int width = edges.Width;
                     int height = edges.Height;
+                    int glowRadius = 6;
+                    double baseAlpha = 40.0;
+                    double distanceScale = 4.0;
 
-                    Parallel.For(2, height - 2, y =>
+                    for (int y = glowRadius; y < height - glowRadius; y++)
                     {
                         byte* row = ptrEdges + (y * stride);
                         byte* resultRow = ptrResult + (y * stride);
 
-                        for (int x = 2; x < width - 2; x++)
+                        for (int x = glowRadius; x < width - glowRadius; x++)
                         {
                             int pixelOffset = x * 4;
-                            if (row[pixelOffset + 2] > 30) // Check red channel for edge
+                            if (row[pixelOffset + 2] > 250)
                             {
-                                // Set edge pixel to white
-                                resultRow[pixelOffset] = 255;     // B
-                                resultRow[pixelOffset + 1] = 255; // G
-                                resultRow[pixelOffset + 2] = 255; // R
-                                resultRow[pixelOffset + 3] = 255; // A
-
-                                // Apply glow to surrounding pixels
-                                for (int i = -4; i <= 4; i++)
+                                for (int i = -glowRadius; i <= glowRadius; i++)
                                 {
-                                    for (int j = -4; j <= 4; j++)
+                                    for (int j = -glowRadius; j <= glowRadius; j++)
                                     {
-                                        if (i == 0 && j == 0) continue;
-
                                         int newY = y + i;
                                         int newX = x + j;
                                         if (newX >= 0 && newX < width && newY >= 0 && newY < height)
                                         {
                                             int targetOffset = (newY * stride) + (newX * 4);
                                             double distance = Math.Sqrt(i * i + j * j);
-                                            int alpha = (int)(150 * Math.Exp(-distance / 2));
+                                            int alpha = (int)(baseAlpha * Math.Exp(-distance / distanceScale));
 
-                                            if (alpha > 0)
-                                            {
-                                                ptrResult[targetOffset] = (byte)((ptrResult[targetOffset] * (255 - alpha) + glowColor.B * alpha) / 255);
-                                                ptrResult[targetOffset + 1] = (byte)((ptrResult[targetOffset + 1] * (255 - alpha) + glowColor.G * alpha) / 255);
-                                                ptrResult[targetOffset + 2] = (byte)((ptrResult[targetOffset + 2] * (255 - alpha) + glowColor.R * alpha) / 255);
-                                            }
+                                            ptrResult[targetOffset] = (byte)Math.Min(255, ((ptrResult[targetOffset] * (255 - alpha) + glowColor.B * alpha) / 255));
+                                            ptrResult[targetOffset + 1] = (byte)Math.Min(255, ((ptrResult[targetOffset + 1] * (255 - alpha) + glowColor.G * alpha) / 255));
+                                            ptrResult[targetOffset + 2] = (byte)Math.Min(255, ((ptrResult[targetOffset + 2] * (255 - alpha) + glowColor.R * alpha) / 255));
+                                            ptrResult[targetOffset + 3] = 255;
                                         }
                                     }
                                 }
                             }
                         }
-                    });
+                    }
                 }
             }
             finally
