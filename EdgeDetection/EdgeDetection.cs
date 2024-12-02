@@ -3,7 +3,7 @@
     public unsafe class EdgeDetection
     {
 
-        private const int THRESHOLD = 30;
+        private const int THRESHOLD = 15;
         private const uint ALPHA_MASK = 0xFF000000;
         private const uint WHITE_PIXEL = 0xFFFFFFFF;
         private const uint BLACK_PIXEL = 0xFF000000;

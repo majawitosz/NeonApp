@@ -55,6 +55,8 @@ namespace NeonApp
             restoreDefault = new Button();
             cSharp_radioBtn = new RadioButton();
             asm_radioBtn = new RadioButton();
+            comboBox1 = new ComboBox();
+            button1 = new Button();
             flowLayoutPanel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)chosenImage).BeginInit();
             ((System.ComponentModel.ISupportInitialize)trackBarThreads).BeginInit();
@@ -319,12 +321,35 @@ namespace NeonApp
             asm_radioBtn.UseVisualStyleBackColor = true;
             asm_radioBtn.CheckedChanged += asm_radioBtn_CheckedChanged;
             // 
+            // comboBox1
+            // 
+            comboBox1.FormattingEnabled = true;
+            comboBox1.Location = new Point(391, 437);
+            comboBox1.Name = "comboBox1";
+            comboBox1.Size = new Size(121, 23);
+            comboBox1.TabIndex = 21;
+            // 
+            // button1
+            // 
+            button1.BackColor = Color.Cyan;
+            button1.FlatStyle = FlatStyle.Flat;
+            button1.ForeColor = Color.Transparent;
+            button1.Location = new Point(279, 441);
+            button1.Name = "button1";
+            button1.Size = new Size(75, 23);
+            button1.TabIndex = 22;
+            button1.TextImageRelation = TextImageRelation.ImageAboveText;
+            button1.UseVisualStyleBackColor = false;
+            
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = SystemColors.ButtonHighlight;
             ClientSize = new Size(915, 763);
+            Controls.Add(button1);
+            Controls.Add(comboBox1);
             Controls.Add(asm_radioBtn);
             Controls.Add(cSharp_radioBtn);
             Controls.Add(restoreDefault);
@@ -388,5 +413,7 @@ namespace NeonApp
         private Button restoreDefault;
         private RadioButton cSharp_radioBtn;
         private RadioButton asm_radioBtn;
+        private ComboBox comboBox1;
+        private Button button1;
     }
 }
