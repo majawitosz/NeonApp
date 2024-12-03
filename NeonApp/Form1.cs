@@ -1,4 +1,5 @@
-﻿using System.Drawing.Imaging;
+﻿using System.Collections.Concurrent;
+using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using CSharp;
 
@@ -16,6 +17,20 @@ namespace NeonApp
         private int defaultThreads;
         private bool useAsm = true;
         private EdgeDetection cSharp = new EdgeDetection();
+
+        public unsafe struct BlockParameters
+        {
+            public int StartX;
+            public int StartY;
+            public int BlockWidth;
+            public int BlockHeight;
+            public int ImageWidth;
+            public int ImageHeight;
+            public int Stride;
+            public byte* OriginalPtr;
+            public byte* EdgesPtr;
+            public bool IsLastBlock;
+        }
         public Form1()
         {
             InitializeComponent();
@@ -29,7 +44,6 @@ namespace NeonApp
             trackBarThreads.Value = Array.IndexOf(threadOptions, defaultThreads);
             threadLabel.Text = $"Number of Threads: {defaultThreads}";
         }
-
         private void chooseImage_Click(object sender, EventArgs e)
         {
             OpenFileDialog openFileDialog1 = new OpenFileDialog();
@@ -71,7 +85,6 @@ namespace NeonApp
             }
 
         }
-
         private void trackBarThreads_Scroll(object sender, EventArgs e)
         {
             threadLabel.Text = $"Number of Threads: {threadOptions[trackBarThreads.Value]}";
@@ -85,44 +98,6 @@ namespace NeonApp
             trackBarThreads.Value = Array.IndexOf(threadOptions, defaultThreads);
             threadLabel.Text = $"Number of Threads: {defaultThreads}";
         }
-
-        // Create a struct to hold the parameters
-        private unsafe struct ThreadParameters
-        {
-            public int StartPixel;
-            public int EndPixel;
-            public byte* OriginalPtr;
-            public byte* EdgesPtr;
-
-            public ThreadParameters(int start, int end, byte* original, byte* edges)
-            {
-                StartPixel = start;
-                EndPixel = end;
-                OriginalPtr = original;
-                EdgesPtr = edges;
-            }
-        }
-
-        private unsafe void ProcessImageSegment(object parameters)
-        {
-            var threadParams = (ThreadParameters)parameters;
-            if (useAsm)
-            {
-                DetectEdges(
-                threadParams.OriginalPtr + (threadParams.StartPixel * 4),
-                threadParams.EdgesPtr + (threadParams.StartPixel * 4),
-                threadParams.EndPixel - threadParams.StartPixel);
-            }
-            else
-            {
-                cSharp.DetectEdges(
-                threadParams.OriginalPtr + (threadParams.StartPixel * 4),
-                threadParams.EdgesPtr + (threadParams.StartPixel * 4),
-                threadParams.EndPixel - threadParams.StartPixel);
-            }
-
-        }
-
         private void cSharp_radioBtn_CheckedChanged(object sender, EventArgs e)
         {
             if (cSharp_radioBtn.Checked)
@@ -130,7 +105,6 @@ namespace NeonApp
                 useAsm = false;
             }
         }
-
         private void asm_radioBtn_CheckedChanged(object sender, EventArgs e)
         {
             if (asm_radioBtn.Checked)
@@ -138,6 +112,199 @@ namespace NeonApp
                 useAsm = true;
             }
         }
+
+        // Create a struct to hold the parameters
+        //private unsafe struct ThreadParameters
+        //{
+        //    public int StartPixel;
+        //    public int EndPixel;
+        //    public byte* OriginalPtr;
+        //    public byte* EdgesPtr;
+
+        //    public ThreadParameters(int start, int end, byte* original, byte* edges)
+        //    {
+        //        StartPixel = start;
+        //        EndPixel = end;
+        //        OriginalPtr = original;
+        //        EdgesPtr = edges;
+        //    }
+        //}
+
+        //private unsafe void ProcessImageSegment(object parameters)
+        //{
+        //    var threadParams = (ThreadParameters)parameters;
+        //    if (useAsm)
+        //    {
+        //        DetectEdges(
+        //        threadParams.OriginalPtr + (threadParams.StartPixel * 4),
+        //        threadParams.EdgesPtr + (threadParams.StartPixel * 4),
+        //        threadParams.EndPixel - threadParams.StartPixel);
+        //    }
+        //    else
+        //    {
+        //        cSharp.DetectEdges(
+        //        threadParams.OriginalPtr + (threadParams.StartPixel * 4),
+        //        threadParams.EdgesPtr + (threadParams.StartPixel * 4),
+        //        threadParams.EndPixel - threadParams.StartPixel);
+        //    }
+
+        //}
+        private unsafe void ProcessImageWithSelectedThreads(byte* ptrOrig, byte* ptrEdges, int imageWidth, int imageHeight)
+        {
+            const int BLOCK_SIZE = 8; // Optymalny rozmiar bloku dla pamięci podręcznej
+            //int adjustedBlockSize = BLOCK_SIZE - (BLOCK_SIZE % 4);  // Upewniamy się że jest wielokrotnością 4
+
+            // Obliczamy liczbę bloków
+            int horizontalBlocks = (imageWidth + BLOCK_SIZE - 1) / BLOCK_SIZE;
+            int verticalBlocks = (imageHeight + BLOCK_SIZE - 1) / BLOCK_SIZE;
+            int totalBlocks = horizontalBlocks * verticalBlocks;
+
+            // Używamy liczby wątków wybranej przez użytkownika
+            int selectedThreadCount = threadOptions[trackBarThreads.Value];
+
+            // Tworzymy kolejkę bloków
+            var blockTasks = new ConcurrentQueue<BlockParameters>();
+
+            // Dzielimy obraz na bloki
+            for (int y = 0; y < imageHeight; y += BLOCK_SIZE)
+            {
+                for (int x = 0; x < imageWidth; x += BLOCK_SIZE)
+                {
+                    blockTasks.Enqueue(new BlockParameters
+                    {
+                        StartX = x,
+                        StartY = y,
+                        BlockWidth = Math.Min(BLOCK_SIZE, imageWidth - x),
+                        BlockHeight = Math.Min(BLOCK_SIZE, imageHeight - y),
+                        ImageWidth = imageWidth,
+                        ImageHeight = imageHeight,
+                        Stride = imageWidth * 4,
+                        OriginalPtr = ptrOrig,
+                        EdgesPtr = ptrEdges,
+                        IsLastBlock = (x + BLOCK_SIZE >= imageWidth) && (y + BLOCK_SIZE >= imageHeight)
+                    });
+                }
+            }
+
+            // Tworzymy wybraną liczbę wątków
+            var threads = new List<Thread>();
+            var countdownEvent = new CountdownEvent(selectedThreadCount);
+
+            for (int i = 0; i < selectedThreadCount; i++)
+            {
+                var thread = new Thread(() =>
+                {
+                    try
+                    {
+                        while (blockTasks.TryDequeue(out BlockParameters blockParams))
+                        {
+                            ProcessBlock(blockParams);
+                        }
+                    }
+                    finally
+                    {
+                        countdownEvent.Signal();
+                    }
+                });
+
+                threads.Add(thread);
+                thread.Start();
+            }
+
+            countdownEvent.Wait();
+        }
+
+        private unsafe void ProcessBlock(BlockParameters blockParams)
+        {
+            if (useAsm)
+            {
+                try
+                {
+                    for (int y = 0; y < blockParams.BlockHeight; y++)
+                    {
+                        int currentY = blockParams.StartY + y;
+                        if (currentY >= blockParams.ImageHeight) continue;
+
+
+                        long rowOffset = (long)currentY * blockParams.Stride;
+                        int startX = blockParams.StartX;
+                        int pixelsToProcess = Math.Min(blockParams.BlockWidth,
+                            blockParams.ImageWidth - startX);
+
+                        if (pixelsToProcess <= 0) continue;
+
+                        // Sprawdzenie czy nie wykraczamy poza granice
+                        if (startX + pixelsToProcess > blockParams.ImageWidth)
+                            continue;
+
+                        // Bezpieczne obliczenie offsetów
+                        byte* inputRow = blockParams.OriginalPtr + rowOffset + (startX * 4);
+                        byte* outputRow = blockParams.EdgesPtr + rowOffset + (startX * 4);
+
+                        // Upewniamy się, że długość jest wielokrotnością 4 (dla SIMD)
+                        int alignedLength = (pixelsToProcess + 3) & ~3;
+
+
+                        Console.WriteLine($"Processing block: Start={blockParams.StartX},{blockParams.StartY} Size={blockParams.BlockWidth}x{blockParams.BlockHeight}");
+                        Console.WriteLine($"Input ptr: {(long)blockParams.OriginalPtr:X}, Output ptr: {(long)blockParams.EdgesPtr:X}");
+                        // Przetwarzamy cały wiersz bloku na raz
+                        DetectEdges(
+                             inputRow,     
+                             outputRow,   
+                             alignedLength
+                        );
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error processing block: {ex.Message}");
+                    throw;
+                }
+            }
+            else
+            {
+                try
+                {
+                    for (int y = 0; y < blockParams.BlockHeight; y++)
+                    {
+                        int currentY = blockParams.StartY + y;
+                        if (currentY >= blockParams.ImageHeight) continue;
+
+
+                        long rowOffset = (long)currentY * blockParams.Stride;
+                        int startX = blockParams.StartX;
+                        int pixelsToProcess = Math.Min(blockParams.BlockWidth,
+                            blockParams.ImageWidth - startX);
+
+                        if (pixelsToProcess <= 0) continue;
+
+                        // Sprawdzenie czy nie wykraczamy poza granice
+                        if (startX + pixelsToProcess > blockParams.ImageWidth)
+                            continue;
+
+                        // Bezpieczne obliczenie offsetów
+                        byte* inputRow = blockParams.OriginalPtr + rowOffset + (startX * 4);
+                        byte* outputRow = blockParams.EdgesPtr + rowOffset + (startX * 4);
+
+                        // Upewniamy się, że długość jest wielokrotnością 4 (dla SIMD)
+                        int alignedLength = (pixelsToProcess + 3) & ~3;
+
+                        // Przetwarzamy cały wiersz bloku na raz
+                        cSharp.DetectEdges(
+                            inputRow,
+                            outputRow,
+                            alignedLength
+                        );
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error processing block: {ex.Message}");
+                    throw;
+                }
+            }
+        }
+
 
         private unsafe void Convert_Click(object sender, EventArgs e)
         {
@@ -150,70 +317,54 @@ namespace NeonApp
             var stopwatch = new System.Diagnostics.Stopwatch();
             stopwatch.Start();
 
-            Bitmap original = new Bitmap(pictureBoxOriginal.Image);
-            Bitmap edges = new Bitmap(original.Width, original.Height);
-            Bitmap result = new Bitmap(original);
-
-            BitmapData originalData = original.LockBits(
-                new Rectangle(0, 0, original.Width, original.Height),
-                ImageLockMode.ReadOnly,
-                PixelFormat.Format32bppArgb);
-
-            BitmapData edgesData = edges.LockBits(
-                new Rectangle(0, 0, edges.Width, edges.Height),
-                ImageLockMode.WriteOnly,
-                PixelFormat.Format32bppArgb);
-
-            try
+ 
+            using (Bitmap original = new Bitmap(pictureBoxOriginal.Image))
+            using (Bitmap edges = new Bitmap(original.Width, original.Height))
             {
-                byte* ptrOrig = (byte*)originalData.Scan0.ToPointer();
-                byte* ptrEdges = (byte*)edgesData.Scan0.ToPointer();
+                BitmapData originalData = original.LockBits(
+                   new Rectangle(0, 0, original.Width, original.Height),
+                   ImageLockMode.ReadOnly,
+                   PixelFormat.Format32bppArgb);
 
-                int totalPixels = original.Width * original.Height;
-                int pixelsPerThread = totalPixels / defaultThreads;
+                BitmapData edgesData = edges.LockBits(
+                    new Rectangle(0, 0, edges.Width, edges.Height),
+                    ImageLockMode.WriteOnly,
+                    PixelFormat.Format32bppArgb);
 
-                // Create and start threads
-                var threads = new List<Thread>();
-
-                for (int i = 0; i < defaultThreads; i++)
+                try
                 {
-                    int startPixel = i * pixelsPerThread;
-                    int endPixel = (i == defaultThreads - 1) ? totalPixels : (i + 1) * pixelsPerThread;
+                    byte* ptrOrig = (byte*)originalData.Scan0.ToPointer();
+                    byte* ptrEdges = (byte*)edgesData.Scan0.ToPointer();
 
-                    var parameters = new ThreadParameters(startPixel, endPixel, ptrOrig, ptrEdges);
-                    var thread = new Thread(ProcessImageSegment);
-                    threads.Add(thread);
-                    thread.Start(parameters);
+                    ProcessImageWithSelectedThreads(ptrOrig, ptrEdges, original.Width, original.Height);
                 }
-
-                // Wait for all threads to complete
-                foreach (var thread in threads)
+                finally
                 {
-                    thread.Join();
+                    original.UnlockBits(originalData);
+                    edges.UnlockBits(edgesData);
                 }
+                stopwatch.Stop();
+                timeLabel.Text = $"Processing time: {stopwatch.ElapsedMilliseconds}ms using {threadOptions[trackBarThreads.Value]} threads";
 
+                if (pictureBoxNeon.Image != null)
+                {
+                    pictureBoxNeon.Image.Dispose();
+                }
+                pictureBoxNeon.Image = (Bitmap)edges.Clone();
+
+                Bitmap result = new Bitmap(original);
+                ApplyGlowEffect(edges, result, Color.FromArgb(255, 0, 255));
+
+                stopwatch.Stop();
+                timeLabel.Text = $"Processing time: {stopwatch.ElapsedMilliseconds}ms using {threadOptions[trackBarThreads.Value]} threads";
+
+                if (pictureBoxNeon.Image != null)
+                {
+                    pictureBoxNeon.Image.Dispose();
+                }
+                pictureBoxNeon.Image = result;
             }
-            finally
-            {
-                original.UnlockBits(originalData);
-                edges.UnlockBits(edgesData);
-            }
-
-            ApplyGlowEffect(edges, result, Color.FromArgb(255, 0, 255));
-
-            stopwatch.Stop();
-            timeLabel.Text = $"Processing time: {stopwatch.ElapsedMilliseconds}ms using {threadOptions[trackBarThreads.Value]} threads";
-
-            if (pictureBoxNeon.Image != null)
-            {
-                pictureBoxNeon.Image.Dispose();
-            }
-            pictureBoxNeon.Image = result;
-            original.Dispose();
-            edges.Dispose();
         }
-
-
 
         private void ApplyGlowEffect(Bitmap edges, Bitmap result, Color glowColor)
         {
@@ -226,9 +377,6 @@ namespace NeonApp
                 new Rectangle(0, 0, result.Width, result.Height),
                 ImageLockMode.WriteOnly,
                 PixelFormat.Format32bppArgb);
-
-            Color whiteGlowColor = Color.White;
-
             try
             {
                 unsafe

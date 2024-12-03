@@ -1,48 +1,80 @@
 .data
-align 16
 BlueMask    dd 4 dup(0FFh)      ; Mask for blue channel
 GreenMask   dd 4 dup(0FF00h)    ; Mask for green channel
 RedMask     dd 4 dup(0FF0000h)  ; Mask for red channel
 AlphaMask   dd 4 dup(0FF000000h); Mask for alpha channel
-Threshold   dd 4 dup(15)        ; Lower threshold for better edge detection
+Threshold   dd 4 dup(15)        ; Edge detection threshold
 BlackPixels dd 4 dup(0)         ; Black pixels (0,0,0,255)
 WhitePixels dd 4 dup(0FFFFFFFFh); White pixels (255,255,255,255)
 
 .code
 DetectEdges proc
+    ; Function prologue
     push rbp
     mov rbp, rsp
     push rsi
     push rdi
     push rbx
+    push r12
+    push r13
+    push r14
     
-    mov rsi, rcx        ; Source image pointer
-    mov rdi, rdx        ; Destination image pointer
+    ; Parameters:
+    ; rcx = source pointer
+    ; rdx = destination pointer
+    ; r8 = image width in pixels
     
-    ; Initialize XMM registers with constants
+    mov rsi, rcx        ; Source pointer
+    mov rdi, rdx        ; Destination pointer
+    mov r12, r8         ; Width
+    
+    ; Initialize SIMD registers
     pxor xmm7, xmm7              
-    movdqu xmm6, xmmword ptr [BlueMask]   
-    movdqu xmm5, xmmword ptr [GreenMask] 
-    movdqu xmm4, xmmword ptr [RedMask]  
+    movdqa xmm6, xmmword ptr [BlueMask]   
+    movdqa xmm5, xmmword ptr [GreenMask] 
+    movdqa xmm4, xmmword ptr [RedMask]  
     movd xmm3, dword ptr [Threshold]     
     pshufd xmm3, xmm3, 0
     
-    xor rcx, rcx        ; Initialize counter
+    ; Calculate row length (aligned to 4 bytes)
+    mov rax, r12        ; Width
+    shl rax, 2          ; Multiply by 4 (bytes per pixel)
+    add rax, 3          ; Add 3 for rounding up
+    and rax, 0FFFFFFFCh ; Align to 4 bytes
+    mov r13, rax        ; Store aligned row length in r13
     
-align 16
+    xor rcx, rcx        ; Pixel counter
+    
 process_loop:
     cmp rcx, r8
     jge done
     
-    ; Load current pixel and pixel to the right
-    mov rax, rcx
+    ; Calculate current position
+    mov rax, rcx        ; Current pixel
+    mov r14, rax        ; Copy for division
+    xor rdx, rdx        ; Clear for division
+    div r12             ; rax = row, rdx = column
+    
+    ; Calculate offset
+    mul r13             ; Multiply row by stride
+    add rax, rdx        ; Add column
     shl rax, 2          ; Multiply by 4 (bytes per pixel)
     
-    ; Load current and next pixels
+    ; Load pixels
     movd xmm0, dword ptr [rsi + rax]
+    ; Check if we're at the last pixel in row
+    mov rbx, rdx
+    inc rbx
+    cmp rbx, r12
+    jge edge_pixel
     movd xmm1, dword ptr [rsi + rax + 4]
+    jmp process_pixels
     
-    ; Extract RGB components for current pixel
+edge_pixel:
+    movd xmm1, dword ptr [rsi + rax]      ; Use same pixel for edge
+    
+process_pixels:
+    ; Extract and process color components (same as before)
     movdqa xmm8, xmm0
     pand xmm8, xmm6    ; Blue
     movdqa xmm9, xmm0
@@ -52,7 +84,7 @@ process_loop:
     pand xmm10, xmm4   ; Red
     psrld xmm10, 16
     
-    ; Extract RGB components for next pixel
+    ; Process next pixel
     movdqa xmm11, xmm1
     pand xmm11, xmm6   ; Blue
     movdqa xmm12, xmm1
@@ -62,7 +94,7 @@ process_loop:
     pand xmm13, xmm4   ; Red
     psrld xmm13, 16
     
-    ; Calculate absolute differences
+    ; Calculate differences
     psubd xmm8, xmm11  ; Blue diff
     pabsd xmm8, xmm8
     psubd xmm9, xmm12  ; Green diff
@@ -70,7 +102,7 @@ process_loop:
     psubd xmm10, xmm13 ; Red diff
     pabsd xmm10, xmm10
     
-    ; Sum up the differences
+    ; Sum differences
     paddd xmm8, xmm9
     paddd xmm8, xmm10
     
@@ -82,17 +114,56 @@ process_loop:
     movd xmm1, dword ptr [AlphaMask]
     por xmm0, xmm1     ; Add alpha channel
     
-    ; If edge detected (xmm8 > 0), set to white
+    ; Set to white if edge detected
     pand xmm8, xmmword ptr [WhitePixels]
     por xmm0, xmm8
     
     ; Store result
+    mov rax, rcx        ; Current pixel
+    mov r14, rax        ; Copy for division
+    xor rdx, rdx        ; Clear for division
+    div r12             ; rax = row, rdx = column
+    
+    ; Calculate destination offset
+    mul r13             ; Multiply row by stride
+    add rax, rdx        ; Add column
+    shl rax, 2          ; Multiply by 4 (bytes per pixel)
+    
+    movd dword ptr [rdi + rax], xmm0
+
+    ; Store to right neighbor if not at right edge
+    mov rbx, rdx
+    inc rbx
+    cmp rbx, r12
+    jge skip_right
+    movd dword ptr [rdi + rax + 4], xmm0
+    
+skip_right:
+    ; Store to bottom neighbor if not at bottom edge
+    mov rax, rcx
+    add rax, r12
+    cmp rax, r8
+    jge next_pixel
+    
+    ; Calculate offset for bottom pixel
+    mov rax, rcx
+    mov r14, rax
+    xor rdx, rdx
+    div r12
+    add rax, 1          ; Next row
+    mul r13
+    add rax, rdx
+    shl rax, 2
     movd dword ptr [rdi + rax], xmm0
     
+next_pixel:
     inc rcx
     jmp process_loop
     
 done:
+    pop r14
+    pop r13
+    pop r12
     pop rbx
     pop rdi
     pop rsi
