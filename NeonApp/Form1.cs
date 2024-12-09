@@ -9,9 +9,8 @@ namespace NeonApp
     {
 
         [DllImport(@"C:\Users\Maja\source\repos\NeonApp\x64\Debug\Asm.dll")]
-        static extern int DetectEdges(byte* inputPixels,
-        byte* outputPixels,
-        int length);
+        static extern void DetectEdges(byte* inputRowPrev, byte* inputRowCurrent, byte* inputRowNext, 
+        byte* outputPixels);
 
         private int[] threadOptions = { 1, 2, 4, 8, 16, 32, 64 };
         private int defaultThreads;
@@ -113,50 +112,15 @@ namespace NeonApp
             }
         }
 
-        // Create a struct to hold the parameters
-        //private unsafe struct ThreadParameters
-        //{
-        //    public int StartPixel;
-        //    public int EndPixel;
-        //    public byte* OriginalPtr;
-        //    public byte* EdgesPtr;
 
-        //    public ThreadParameters(int start, int end, byte* original, byte* edges)
-        //    {
-        //        StartPixel = start;
-        //        EndPixel = end;
-        //        OriginalPtr = original;
-        //        EdgesPtr = edges;
-        //    }
-        //}
-
-        //private unsafe void ProcessImageSegment(object parameters)
-        //{
-        //    var threadParams = (ThreadParameters)parameters;
-        //    if (useAsm)
-        //    {
-        //        DetectEdges(
-        //        threadParams.OriginalPtr + (threadParams.StartPixel * 4),
-        //        threadParams.EdgesPtr + (threadParams.StartPixel * 4),
-        //        threadParams.EndPixel - threadParams.StartPixel);
-        //    }
-        //    else
-        //    {
-        //        cSharp.DetectEdges(
-        //        threadParams.OriginalPtr + (threadParams.StartPixel * 4),
-        //        threadParams.EdgesPtr + (threadParams.StartPixel * 4),
-        //        threadParams.EndPixel - threadParams.StartPixel);
-        //    }
-
-        //}
         private unsafe void ProcessImageWithSelectedThreads(byte* ptrOrig, byte* ptrEdges, int imageWidth, int imageHeight)
         {
             const int BLOCK_SIZE = 8; // Optymalny rozmiar bloku dla pamięci podręcznej
             //int adjustedBlockSize = BLOCK_SIZE - (BLOCK_SIZE % 4);  // Upewniamy się że jest wielokrotnością 4
 
             // Obliczamy liczbę bloków
-            int horizontalBlocks = (imageWidth + BLOCK_SIZE - 1) / BLOCK_SIZE;
-            int verticalBlocks = (imageHeight + BLOCK_SIZE - 1) / BLOCK_SIZE;
+            int horizontalBlocks = (imageWidth / BLOCK_SIZE) + (imageWidth % BLOCK_SIZE == 0 ? 0 : 1);
+            int verticalBlocks = (imageHeight / BLOCK_SIZE) + (imageHeight % BLOCK_SIZE == 0 ? 0 : 1);
             int totalBlocks = horizontalBlocks * verticalBlocks;
 
             // Używamy liczby wątków wybranej przez użytkownika
@@ -223,41 +187,31 @@ namespace NeonApp
                     for (int y = 0; y < blockParams.BlockHeight; y++)
                     {
                         int currentY = blockParams.StartY + y;
-                        if (currentY >= blockParams.ImageHeight) continue;
-
-
-                        long rowOffset = (long)currentY * blockParams.Stride;
-                        int startX = blockParams.StartX;
-                        int pixelsToProcess = Math.Min(blockParams.BlockWidth,
-                            blockParams.ImageWidth - startX);
-
-                        if (pixelsToProcess <= 0) continue;
-
-                        // Sprawdzenie czy nie wykraczamy poza granice
-                        if (startX + pixelsToProcess > blockParams.ImageWidth)
+                        if (currentY == 0 || currentY == blockParams.ImageHeight - 1)
                             continue;
 
-                        // Bezpieczne obliczenie offsetów
-                        byte* inputRow = blockParams.OriginalPtr + rowOffset + (startX * 4);
-                        byte* outputRow = blockParams.EdgesPtr + rowOffset + (startX * 4);
+                        long rowOffsetCurrent = (long)currentY * blockParams.Stride;
+                        long rowOffsetPrev = (long)(currentY - 1) * blockParams.Stride;  // Wiersz powyżej
+                        long rowOffsetNext = (long)(currentY + 1) * blockParams.Stride;  // Wiersz poniżej
 
-                        // Upewniamy się, że długość jest wielokrotnością 4 (dla SIMD)
-                        int alignedLength = (pixelsToProcess + 3) & ~3;
+                        int startX = blockParams.StartX;
+                        int pixelsToProcess = Math.Min(blockParams.BlockWidth, blockParams.ImageWidth - startX);
+                     
+                        if (startX == 0 || startX + pixelsToProcess == blockParams.ImageWidth)
+                            continue;
 
-
-                        Console.WriteLine($"Processing block: Start={blockParams.StartX},{blockParams.StartY} Size={blockParams.BlockWidth}x{blockParams.BlockHeight}");
-                        Console.WriteLine($"Input ptr: {(long)blockParams.OriginalPtr:X}, Output ptr: {(long)blockParams.EdgesPtr:X}");
-                        // Przetwarzamy cały wiersz bloku na raz
-                        DetectEdges(
-                             inputRow,     
-                             outputRow,   
-                             alignedLength
-                        );
+                        byte* inputRowPrev = blockParams.OriginalPtr + rowOffsetPrev + (startX * 4);
+                        byte* inputRowCurrent = blockParams.OriginalPtr + rowOffsetCurrent + (startX * 4);
+                        byte* inputRowNext = blockParams.OriginalPtr + rowOffsetNext + (startX * 4);
+                        byte* outputRow = blockParams.EdgesPtr + rowOffsetCurrent + (startX * 4);
+  
+                        DetectEdges(inputRowPrev, inputRowCurrent, inputRowNext, outputRow);
+                        
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error processing block: {ex.Message}");
+                    MessageBox.Show($"Error processing block: {ex.Message}");
                     throw;
                 }
             }
@@ -352,17 +306,17 @@ namespace NeonApp
                 }
                 pictureBoxNeon.Image = (Bitmap)edges.Clone();
 
-                Bitmap result = new Bitmap(original);
-                ApplyGlowEffect(edges, result, Color.FromArgb(255, 0, 255));
+                //Bitmap result = new Bitmap(original);
+                //ApplyGlowEffect(edges, result, Color.FromArgb(255, 0, 255));
 
-                stopwatch.Stop();
-                timeLabel.Text = $"Processing time: {stopwatch.ElapsedMilliseconds}ms using {threadOptions[trackBarThreads.Value]} threads";
+                //stopwatch.Stop();
+                //timeLabel.Text = $"Processing time: {stopwatch.ElapsedMilliseconds}ms using {threadOptions[trackBarThreads.Value]} threads";
 
-                if (pictureBoxNeon.Image != null)
-                {
-                    pictureBoxNeon.Image.Dispose();
-                }
-                pictureBoxNeon.Image = result;
+                //if (pictureBoxNeon.Image != null)
+                //{
+                //    pictureBoxNeon.Image.Dispose();
+                //}
+                //pictureBoxNeon.Image = result;
             }
         }
 
