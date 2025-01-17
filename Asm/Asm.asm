@@ -1,20 +1,18 @@
 .data
-    r_weight dd 0.299       ; Changed to float
-    g_weight dd 0.587       ; Changed to float
-    b_weight dd 0.114       ; Changed to float
+    r_weight dd 0.299       
+    g_weight dd 0.587       
+    b_weight dd 0.114      
     r_mask dd 8 dup(00FF0000h) 
     g_mask dd 8 dup(0000FF00h)  
     b_mask dd 8 dup(000000FFh)  
     white_pixel dd 8 dup(0FFFFFFFFh)
-    black_pixel dd 8 dup(0)
-    alpha_val dd 255 
+    AlphaMask dd 8 dup(0FF000000h)
     treshold dd 8 dup(30)
     sobel_gx_tb dd 0, 0, 0, 0, 0, 1, 0, -1
     sobel_gx_m dd 0, 0, 0, 0, 0, 2, 0, -2
     sobel_gy_t dd 0, 0, 0, 0, 0, -1, -2, -1
     sobel_gy_m dd 0, 0, 0, 0, 0, 0, 0, 0
     sobel_gy_b dd 0, 0, 0, 0, 0, 1, 2, 1
-   
 
 .code
 ; 1st param (inputRowPrev) -> rcx
@@ -124,11 +122,12 @@ DetectEdges proc
     vmovdqu ymm6, ymmword ptr [sobel_gy_m]
     vmovdqu ymm7, ymmword ptr [sobel_gy_b]
 
-    mov r10, 5
+    mov r10, 6
     mov eax, 01111111b
     vxorps ymm14, ymm14, ymm14
     vxorps ymm13, ymm13, ymm13
     vxorps ymm12, ymm12, ymm12
+    vxorps ymm11, ymm11, ymm11
     vxorps ymm15, ymm15, ymm15
 
 Sobel:
@@ -146,45 +145,17 @@ Sobel:
     vpaddd ymm8, ymm8, ymm9   
     vpaddd ymm8, ymm8, ymm10 
 
-   
-
-    
-
     vpblendd ymm8, ymm8, ymm13, 01111111b
-    vextracti128 xmm8, ymm8, 1 ; przenies gorna czesc ymm8 do xmm8
-    vpsrldq ymm8, ymm8, 12 ; przesun na przedostnie 4 bajty
+    vpsrldq ymm8, ymm8, 12 
    
-    VPBROADCASTD ymm8, xmm8
-
-   VPMASKMOVD ymm14, ymm12, ymmword ptr [ymm8]
-
-    ror eax, 1
-   ; VPBLENDVB ymm14, ymm8, 
-
-
-
+    cmp r10, 3
+    je MoveGx
+    BackGx:
  
+    vpor ymm14, ymm8, ymm14 ; zapisz do ymm14
+    vpslldq ymm14, ymm14, 4 ; przesun aby moc zapisywac nastpene
 
-
-    ; shl r10, 2                ; Pozycja w bitach (4 bajty na piksel)
-    ror eax, 1            ; Przesun maske
-    vmovd xmm12, eax           ; Zaladuj maske do XMM
-    
-    VINSERTI128 ymm12, ymm12, xmm12, 1 ; Poszerz do YMM
-    VPBLENDVB ymm14, ymm14, ymm8, ymm12
-
-
-    
-
-    ; cmp r10, 3
-    ; jb Move
-    ; Back:
- 
-    ;vpor ymm14, ymm8, ymm14 ; zapisz do ymm14
-    ;vpslldq ymm14, ymm14, 4 ; przesun aby moc zapisywac nastpene
-
-
-    ; === Obliczanie Gy ===
+     ; === Obliczanie Gy ===
 
     vpmulld ymm8, ymm0, ymm5  ; top row * mask gx_tb
     vpmulld ymm9, ymm1, ymm6  ; middle row * mask gx_m
@@ -200,8 +171,11 @@ Sobel:
     vpaddd ymm8, ymm8, ymm10 
 
     vpblendw ymm8, ymm8, ymm13, 00111111b
-    vextracti128 xmm8, ymm8, 1 ; przenies gorna czesc ymm8 do xmm8
-    vpsrldq ymm8, ymm8, 8 ; przesun na przedostnie 4 bajty
+    vpsrldq ymm8, ymm8, 12 
+
+    cmp r10, 3
+    je MoveGy
+    BackGy:
 
     vpor ymm15, ymm8, ymm15 ; zapisz do ymm15
     vpslldq ymm15, ymm15, 4 ; przesun aby moc zapisywac nastpene
@@ -215,13 +189,18 @@ Sobel:
     dec r10                
     jnz Sobel        
     jmp Store
-; Move:
- ;   VEXTRACTI128 xmm12, ymm14, 0     ; Pobierz dolna polowe ymm14 do xmm0
- ;   VPSLLDQ xmm12, xmm12, 4           
- ;   VINSERTI128 ymm14, ymm14, xmm12, 1 ; Wstaw zmodyfikowana dolna polowe na gore ymm14
- ;   jmp Back
+MoveGx:
+    VEXTRACTI128 xmm12, ymm14, 1    ; Pobierz gorna polowe ymm14 do xmm0
+    jmp BackGx
+
+MoveGy:
+    VEXTRACTI128 xmm11, ymm15, 1    ; Pobierz gorna polowe ymm14 do xmm0
+    jmp BackGy
 
 Store:
+    vperm2f128 ymm14, ymm14, ymm12, 00100001b
+    vperm2f128 ymm15, ymm15, ymm11, 00100001b
+    
     vpmulld ymm14, ymm14, ymm14
     vpmulld ymm15, ymm15, ymm15
 
@@ -233,6 +212,9 @@ Store:
     VPCMPGTD ymm13, ymm15, ymm14  ; porownanie z progiem jesli wiekjsze to 1
     vbroadcastss ymm12, dword ptr [white_pixel]
     vpand ymm15, ymm12, ymm13
+
+    vbroadcastss ymm14, dword ptr [AlphaMask]
+    vpor ymm15, ymm15, ymm14     
 
     vmovdqu ymmword ptr [r9], ymm15   ; Store processed pixels
     
