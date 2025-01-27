@@ -55,6 +55,7 @@ namespace NeonApp
             restoreDefault = new Button();
             cSharp_radioBtn = new RadioButton();
             asm_radioBtn = new RadioButton();
+            button1 = new Button();
             flowLayoutPanel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)chosenImage).BeginInit();
             ((System.ComponentModel.ISupportInitialize)trackBarThreads).BeginInit();
@@ -319,12 +320,23 @@ namespace NeonApp
             asm_radioBtn.UseVisualStyleBackColor = true;
             asm_radioBtn.CheckedChanged += asm_radioBtn_CheckedChanged;
             // 
+            // button1
+            // 
+            button1.Location = new Point(309, 444);
+            button1.Name = "button1";
+            button1.Size = new Size(75, 23);
+            button1.TabIndex = 21;
+            button1.Text = "button1";
+            button1.UseVisualStyleBackColor = true;
+            button1.Click += button1_Click;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = SystemColors.ButtonHighlight;
             ClientSize = new Size(915, 763);
+            Controls.Add(button1);
             Controls.Add(asm_radioBtn);
             Controls.Add(cSharp_radioBtn);
             Controls.Add(restoreDefault);
@@ -388,5 +400,6 @@ namespace NeonApp
         private Button restoreDefault;
         private RadioButton cSharp_radioBtn;
         private RadioButton asm_radioBtn;
+        private Button button1;
     }
 }

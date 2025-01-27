@@ -15,11 +15,6 @@
     sobel_gy_b dd 0, 0, 0, 0, 0, 1, 2, 1
 
 .code
-; 1st param (inputRowPrev) -> rcx
-; 2nd param (inputRowCurrent) -> rdx  
-; 3rd param (inputRowNext) -> r8
-; 4th param (outputPixels) -> r9
-
 DetectEdges proc
     push rbp
     mov rbp, rsp
@@ -72,8 +67,6 @@ DetectEdges proc
     vbroadcastss ymm3, dword ptr [r_weight]
     vbroadcastss ymm4, dword ptr [g_weight]
     vbroadcastss ymm5, dword ptr [b_weight]
-   ; vbroadcastss ymm15, dword ptr [alpha_val]  ; Load and broadcast alpha value
-   ; vpslld ymm15, ymm15, 24    ; Shift left by 24 for alpha
 
     ; === Greyscale mul for ymm0 (Previous Row) ===
     vmulps ymm6, ymm6, ymm3  ; red * 0.299
@@ -115,26 +108,20 @@ DetectEdges proc
     vxorps ymm2, ymm2, ymm2    ; Clear ymm2
     vmovdqu ymm2, ymm12  
 
-    ; === Load Sobel masks for gx and gy ===
-    vmovdqu ymm3, ymmword ptr [sobel_gx_tb]
-    vmovdqu ymm4, ymmword ptr [sobel_gx_m]
-    vmovdqu ymm5, ymmword ptr [sobel_gy_t]
-    vmovdqu ymm6, ymmword ptr [sobel_gy_m]
-    vmovdqu ymm7, ymmword ptr [sobel_gy_b]
-
     mov r10, 6
     mov eax, 01111111b
-    vxorps ymm14, ymm14, ymm14
-    vxorps ymm13, ymm13, ymm13
-    vxorps ymm12, ymm12, ymm12
-    vxorps ymm11, ymm11, ymm11
-    vxorps ymm15, ymm15, ymm15
+    vxorps ymm6, ymm6, ymm6
 
+    vperm2i128 ymm11, ymm0, ymm11, 00110000b
+    vperm2i128 ymm12, ymm1, ymm12, 00110000b
+    vperm2i128 ymm13, ymm2, ymm13, 00110000b
+
+    
 Sobel:
     ; === Obliczanie Gx ===
-    vpmulld ymm8, ymm0, ymm3  ; top row * mask gx_tb
-    vpmulld ymm9, ymm1, ymm4  ; middle row * mask gx_m
-    vpmulld ymm10, ymm2, ymm3 ; bottom row * mask gx_tb
+    vpmulld ymm8, ymm0, ymmword ptr [sobel_gx_tb]  ; top row * mask gx_tb
+    vpmulld ymm9, ymm1, ymmword ptr [sobel_gx_m] ; middle row * mask gx_m
+    vpmulld ymm10, ymm2, ymmword ptr [sobel_gx_tb]; bottom row * mask gx_tb
 
     vpaddd ymm8, ymm8, ymm9   
     vpaddd ymm8, ymm8, ymm10  
@@ -145,7 +132,7 @@ Sobel:
     vpaddd ymm8, ymm8, ymm9   
     vpaddd ymm8, ymm8, ymm10 
 
-    vpblendd ymm8, ymm8, ymm13, 01111111b
+    vpblendd ymm8, ymm8, ymm6, 01111111b
     vpsrldq ymm8, ymm8, 12 
    
     cmp r10, 3
@@ -157,9 +144,9 @@ Sobel:
 
      ; === Obliczanie Gy ===
 
-    vpmulld ymm8, ymm0, ymm5  ; top row * mask gx_tb
-    vpmulld ymm9, ymm1, ymm6  ; middle row * mask gx_m
-    vpmulld ymm10, ymm2, ymm7 ; bottom row * mask gx_tb
+    vpmulld ymm8, ymm0, ymmword ptr [sobel_gy_t] ; top row * mask gx_tb
+    vpmulld ymm9, ymm1, ymmword ptr [sobel_gy_m]  ; middle row * mask gx_m
+    vpmulld ymm10, ymm2, ymmword ptr [sobel_gy_b] ; bottom row * mask gx_tb
 
     vpaddd ymm8, ymm8, ymm9   
     vpaddd ymm8, ymm8, ymm10  
@@ -170,7 +157,7 @@ Sobel:
     vpaddd ymm8, ymm8, ymm9   
     vpaddd ymm8, ymm8, ymm10 
 
-    vpblendw ymm8, ymm8, ymm13, 00111111b
+    vpblendw ymm8, ymm8, ymm6, 00111111b
     vpsrldq ymm8, ymm8, 12 
 
     cmp r10, 3
@@ -181,45 +168,78 @@ Sobel:
     vpslldq ymm15, ymm15, 4 ; przesun aby moc zapisywac nastpene
 
     ; === Przesuniecie na nastepny piksel ===
-   
-    vpslldq ymm0, ymm0, 4
+    
+    vpslldq ymm0, ymm0, 4  ; przesuwanie pikseli
     vpslldq ymm1, ymm1, 4
     vpslldq ymm2, ymm2, 4
 
+    ;top row
+    VINSERTI128 ymm3, ymm11, xmm11, 1 
+    vpsrldq ymm3, ymm3, 12
+    vpslldq ymm11, ymm11, 4
+    VPBLENDD ymm0, ymm0, ymm3, 00010000b
+
+    ;middle row
+    VINSERTI128 ymm3, ymm12, xmm12, 1 
+    vpsrldq ymm3, ymm3, 12
+    vpslldq ymm12, ymm12, 4
+    VPBLENDD ymm1, ymm1, ymm3, 00010000b
+
+    ;bottom row
+    VINSERTI128 ymm3, ymm13, xmm13, 1 
+    vpsrldq ymm3, ymm3, 12
+    vpslldq ymm13, ymm13, 4
+    VPBLENDD ymm2, ymm2, ymm3, 00010000b
+    
     dec r10                
     jnz Sobel        
     jmp Store
 MoveGx:
-    VEXTRACTI128 xmm12, ymm14, 1    ; Pobierz gorna polowe ymm14 do xmm0
+    VEXTRACTI128 xmm4, ymm14, 1    
     jmp BackGx
 
 MoveGy:
-    VEXTRACTI128 xmm11, ymm15, 1    ; Pobierz gorna polowe ymm14 do xmm0
+    VEXTRACTI128 xmm5, ymm15, 1   
     jmp BackGy
 
 Store:
-    vperm2f128 ymm14, ymm14, ymm12, 00100001b
-    vperm2f128 ymm15, ymm15, ymm11, 00100001b
+   VEXTRACTI128 xmm9, ymm14, 1 
+   VEXTRACTI128 xmm10, ymm15, 1 
+
+   VPBLENDD ymm7, ymm9, ymm6, 11110111b
+   VPBLENDD ymm8, ymm10, ymm6, 11110111b
+
+   PEXTRD eax, xmm7, 3
+   PINSRD xmm4, EAX, 0   
+ 
+   PEXTRD eax, xmm8, 3
+   PINSRD xmm5, EAX, 0 
+
+   vpslldq ymm9, ymm9, 4
+   vpslldq ymm10, ymm10, 4
+
+   vperm2f128 ymm14, ymm9, ymm4, 00100000b
+   vperm2f128 ymm15, ymm10, ymm5, 00100000b
+
+   vpmulld ymm14, ymm14, ymm14
+   vpmulld ymm15, ymm15, ymm15
+
+   vpaddd ymm15, ymm14, ymm15
+   VCVTDQ2PS ymm15, ymm15
+   VSQRTPS ymm15, ymm15
+   VCVTPS2DQ ymm15, ymm15
+   vbroadcastss ymm14, dword ptr [treshold]
+   VPCMPGTD ymm13, ymm15, ymm14  ; porownanie z progiem jesli wiekjsze to 1
+   vbroadcastss ymm12, dword ptr [white_pixel]
+   vpand ymm15, ymm12, ymm13
+
+   vbroadcastss ymm14, dword ptr [AlphaMask]
+   vpor ymm15, ymm15, ymm14  
     
-    vpmulld ymm14, ymm14, ymm14
-    vpmulld ymm15, ymm15, ymm15
-
-    vpaddd ymm15, ymm14, ymm15
-    VCVTDQ2PS ymm15, ymm15
-    VSQRTPS ymm15, ymm15
-    VCVTPS2DQ ymm15, ymm15
-    vbroadcastss ymm14, dword ptr [treshold]
-    VPCMPGTD ymm13, ymm15, ymm14  ; porownanie z progiem jesli wiekjsze to 1
-    vbroadcastss ymm12, dword ptr [white_pixel]
-    vpand ymm15, ymm12, ymm13
-
-    vbroadcastss ymm14, dword ptr [AlphaMask]
-    vpor ymm15, ymm15, ymm14     
-
-    vmovdqu ymmword ptr [r9], ymm15   ; Store processed pixels
+   vmovdqu ymmword ptr [r9], ymm15   ; Store processed pixels
     
-    mov rsp, rbp
-    pop rbp
-    ret
+   mov rsp, rbp
+   pop rbp
+   ret
 DetectEdges endp
 end

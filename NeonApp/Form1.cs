@@ -9,7 +9,7 @@ namespace NeonApp
     {
 
         [DllImport(@"C:\Users\Maja\source\repos\NeonApp\x64\Debug\Asm.dll")]
-        static extern void DetectEdges(byte* inputRowPrev, byte* inputRowCurrent, byte* inputRowNext, 
+        static extern void DetectEdges(byte* inputRowPrev, byte* inputRowCurrent, byte* inputRowNext,
         byte* outputPixels);
 
         private int[] threadOptions = { 1, 2, 4, 8, 16, 32, 64 };
@@ -115,39 +115,34 @@ namespace NeonApp
 
         private unsafe void ProcessImageWithSelectedThreads(byte* ptrOrig, byte* ptrEdges, int imageWidth, int imageHeight)
         {
-            const int BLOCK_SIZE = 8; // Optymalny rozmiar bloku dla pamięci podręcznej
-            //int adjustedBlockSize = BLOCK_SIZE - (BLOCK_SIZE % 4);  // Upewniamy się że jest wielokrotnością 4
+            const int BLOCK_SIZE_WIDTH = 8;
+            const int BLOCK_SIZE_HEIGHT = 3;
 
-            // Obliczamy liczbę bloków
-            int horizontalBlocks = (imageWidth / BLOCK_SIZE) + (imageWidth % BLOCK_SIZE == 0 ? 0 : 1);
-            int verticalBlocks = (imageHeight / BLOCK_SIZE) + (imageHeight % BLOCK_SIZE == 0 ? 0 : 1);
-            int totalBlocks = horizontalBlocks * verticalBlocks;
 
-            // Używamy liczby wątków wybranej przez użytkownika
+
             int selectedThreadCount = threadOptions[trackBarThreads.Value];
 
-            // Tworzymy kolejkę bloków
             var blockTasks = new ConcurrentQueue<BlockParameters>();
 
-            // Dzielimy obraz na bloki
-            for (int y = 0; y < imageHeight; y += BLOCK_SIZE)
+            for (int y = 0; y < imageHeight; y += BLOCK_SIZE_HEIGHT)
             {
-                for (int x = 0; x < imageWidth; x += BLOCK_SIZE)
+                for (int x = 0; x < imageWidth; x += 6)
                 {
                     blockTasks.Enqueue(new BlockParameters
                     {
                         StartX = x,
                         StartY = y,
-                        BlockWidth = Math.Min(BLOCK_SIZE, imageWidth - x),
-                        BlockHeight = Math.Min(BLOCK_SIZE, imageHeight - y),
+                        BlockWidth = Math.Min(BLOCK_SIZE_WIDTH, imageWidth - x),
+                        BlockHeight = Math.Min(BLOCK_SIZE_HEIGHT, imageHeight - y),
                         ImageWidth = imageWidth,
                         ImageHeight = imageHeight,
                         Stride = imageWidth * 4,
                         OriginalPtr = ptrOrig,
                         EdgesPtr = ptrEdges,
-                        IsLastBlock = (x + BLOCK_SIZE >= imageWidth) && (y + BLOCK_SIZE >= imageHeight)
+
                     });
-                }
+
+                };
             }
 
             // Tworzymy wybraną liczbę wątków
@@ -190,23 +185,34 @@ namespace NeonApp
                         if (currentY == 0 || currentY == blockParams.ImageHeight - 1)
                             continue;
 
-                        long rowOffsetCurrent = (long)currentY * blockParams.Stride;
                         long rowOffsetPrev = (long)(currentY - 1) * blockParams.Stride;  // Wiersz powyżej
+                        long rowOffsetCurrent = (long)currentY * blockParams.Stride;
                         long rowOffsetNext = (long)(currentY + 1) * blockParams.Stride;  // Wiersz poniżej
 
                         int startX = blockParams.StartX;
-                        int pixelsToProcess = Math.Min(blockParams.BlockWidth, blockParams.ImageWidth - startX);
-                     
-                        if (startX == 0 || startX + pixelsToProcess == blockParams.ImageWidth)
-                            continue;
+
+                        //int pixelsToProcess = Math.Min(blockParams.BlockWidth, blockParams.ImageWidth - startX);
+
+                        //if (startX == 0 || startX + 6 >= blockParams.ImageWidth)
+                        //    continue;
 
                         byte* inputRowPrev = blockParams.OriginalPtr + rowOffsetPrev + (startX * 4);
                         byte* inputRowCurrent = blockParams.OriginalPtr + rowOffsetCurrent + (startX * 4);
                         byte* inputRowNext = blockParams.OriginalPtr + rowOffsetNext + (startX * 4);
-                        byte* outputRow = blockParams.EdgesPtr + rowOffsetCurrent + (startX * 4);
-  
-                        DetectEdges(inputRowPrev, inputRowCurrent, inputRowNext, outputRow);
+                        // byte* outputRow = blockParams.EdgesPtr + rowOffsetCurrent + (startX * 4);
+
+                        byte* tempOutput = stackalloc byte[32];
                         
+
+
+                        DetectEdges(inputRowPrev, inputRowCurrent, inputRowNext, tempOutput);
+                        byte* outputRow = blockParams.EdgesPtr + rowOffsetCurrent + (startX * 4);
+
+                        for (int i = 8; i < 32; i++) // 6 pikseli * 4 bajty = 24 bajty <=???
+                        {
+                            outputRow[i] = tempOutput[i];
+                        }
+
                     }
                 }
                 catch (Exception ex)
@@ -271,7 +277,7 @@ namespace NeonApp
             var stopwatch = new System.Diagnostics.Stopwatch();
             stopwatch.Start();
 
- 
+
             using (Bitmap original = new Bitmap(pictureBoxOriginal.Image))
             using (Bitmap edges = new Bitmap(original.Width, original.Height))
             {
@@ -417,8 +423,51 @@ namespace NeonApp
                 currentLabel.Text = $"{threadOptions[i]} threads: {averageTime:F2}ms";
             }
         }
-        
 
-      
+        private void button1_Click(object sender, EventArgs e)
+        {
+            if (pictureBoxNeon.Image == null)
+            {
+                MessageBox.Show("Please process an image first.", "No Image",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            SaveFileDialog saveFileDialog = new SaveFileDialog();
+            saveFileDialog.Filter = "PNG Image|*.png|JPEG Image|*.jpg|Bitmap Image|*.bmp";
+            saveFileDialog.Title = "Save Processed Image";
+            saveFileDialog.DefaultExt = "png";
+
+            if (saveFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                try
+                {
+                    string extension = Path.GetExtension(saveFileDialog.FileName).ToLower();
+                    ImageFormat format = ImageFormat.Png; // Default format
+
+                    switch (extension)
+                    {
+                        case ".jpg":
+                        case ".jpeg":
+                            format = ImageFormat.Jpeg;
+                            break;
+                        case ".bmp":
+                            format = ImageFormat.Bmp;
+                            break;
+                    }
+
+                    // Save the image
+                    pictureBoxNeon.Image.Save(saveFileDialog.FileName, format);
+
+                    MessageBox.Show("Image saved successfully!", "Success",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error saving image: {ex.Message}", "Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
     }
 }
