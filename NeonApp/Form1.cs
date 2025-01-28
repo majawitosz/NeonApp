@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using CSharp;
@@ -116,62 +117,83 @@ namespace NeonApp
 
         private unsafe void ProcessImageWithSelectedThreads(byte* ptrOrig, byte* ptrEdges, int imageWidth, int imageHeight)
         {
-            const int BLOCK_SIZE_WIDTH = 8;
+            const int BLOCK_SIZE_WIDTH = 6;
             const int BLOCK_SIZE_HEIGHT = 3;
 
-
-
             int selectedThreadCount = threadOptions[trackBarThreads.Value];
+
+            int totalBlocksY = (imageHeight + BLOCK_SIZE_HEIGHT - 1) / BLOCK_SIZE_HEIGHT;
+            int totalBlocksX = (imageWidth + 6 - 1) / 6;
+            int totalBlocks = totalBlocksY * totalBlocksX;
+
+            selectedThreadCount = Math.Min(selectedThreadCount, totalBlocks);
+            if (selectedThreadCount <= 0) selectedThreadCount = 1;
 
             var blockTasks = new ConcurrentQueue<BlockParameters>();
 
             for (int y = 0; y < imageHeight; y += BLOCK_SIZE_HEIGHT)
             {
-                for (int x = 0; x < imageWidth; x += 6)
+                for (int x = 0; x < imageWidth; x += BLOCK_SIZE_WIDTH)
                 {
+        
+                    int blockWidth = Math.Min(BLOCK_SIZE_WIDTH, imageWidth - x);
+                    int blockHeight = Math.Min(BLOCK_SIZE_HEIGHT, imageHeight - y);
+
                     blockTasks.Enqueue(new BlockParameters
                     {
                         StartX = x,
                         StartY = y,
-                        BlockWidth = Math.Min(BLOCK_SIZE_WIDTH, imageWidth - x),
-                        BlockHeight = Math.Min(BLOCK_SIZE_HEIGHT, imageHeight - y),
+                        BlockWidth = blockWidth,
+                        BlockHeight = blockHeight,
                         ImageWidth = imageWidth,
                         ImageHeight = imageHeight,
                         Stride = imageWidth * 4,
                         OriginalPtr = ptrOrig,
-                        EdgesPtr = ptrEdges,
-
+                        EdgesPtr = ptrEdges
                     });
-
-                };
+                }
             }
 
-            // Tworzymy wybraną liczbę wątków
-            var threads = new List<Thread>();
-            var countdownEvent = new CountdownEvent(selectedThreadCount);
-
-            for (int i = 0; i < selectedThreadCount; i++)
+            try
             {
-                var thread = new Thread(() =>
+
+                using (var countdownEvent = new CountdownEvent(selectedThreadCount))
                 {
-                    try
+                    var threads = new List<Thread>();
+
+                    for (int i = 0; i < selectedThreadCount; i++)
                     {
-                        while (blockTasks.TryDequeue(out BlockParameters blockParams))
+                        var thread = new Thread(() =>
                         {
-                            ProcessBlock(blockParams);
-                        }
-                    }
-                    finally
-                    {
-                        countdownEvent.Signal();
-                    }
-                });
+                            try
+                            {
+                                while (blockTasks.TryDequeue(out BlockParameters blockParams))
+                                {
+                                    ProcessBlock(blockParams);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                     
+                                Debug.WriteLine($"Thread error: {ex.Message}");
+                            }
+                            finally
+                            {
+                                countdownEvent.Signal();
+                            }
+                        });
 
-                threads.Add(thread);
-                thread.Start();
+                        threads.Add(thread);
+                        thread.Start();
+                    }
+
+                    countdownEvent.Wait();
+                }
             }
-
-            countdownEvent.Wait();
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error processing image: {ex.Message}");
+            }
         }
 
         private unsafe void ProcessBlock(BlockParameters blockParams)
