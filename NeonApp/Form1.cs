@@ -17,6 +17,7 @@ namespace NeonApp
         private int[] threadOptions = { 1, 2, 4, 8, 16, 32, 64 };
         private int defaultThreads;
         private bool useAsm = true;
+        private Color selectedGlowColor = Color.FromArgb(255, 0, 255);
         private EdgeDetection cSharp = new EdgeDetection();
 
         public unsafe struct BlockParameters
@@ -113,8 +114,6 @@ namespace NeonApp
                 useAsm = true;
             }
         }
-
-
         private unsafe void ProcessImageWithSelectedThreads(byte* ptrOrig, byte* ptrEdges, int imageWidth, int imageHeight)
         {
             const int BLOCK_SIZE_WIDTH = 6;
@@ -135,7 +134,7 @@ namespace NeonApp
             {
                 for (int x = 0; x < imageWidth; x += BLOCK_SIZE_WIDTH)
                 {
-        
+
                     int blockWidth = Math.Min(BLOCK_SIZE_WIDTH, imageWidth - x);
                     int blockHeight = Math.Min(BLOCK_SIZE_HEIGHT, imageHeight - y);
 
@@ -174,7 +173,7 @@ namespace NeonApp
                             }
                             catch (Exception ex)
                             {
-                     
+
                                 Debug.WriteLine($"Thread error: {ex.Message}");
                             }
                             finally
@@ -195,7 +194,6 @@ namespace NeonApp
                 MessageBox.Show($"Error processing image: {ex.Message}");
             }
         }
-
         private unsafe void ProcessBlock(BlockParameters blockParams)
         {
             if (useAsm)
@@ -208,9 +206,9 @@ namespace NeonApp
                         if (currentY == 0 || currentY == blockParams.ImageHeight - 1)
                             continue;
 
-                        long rowOffsetPrev = (long)(currentY - 1) * blockParams.Stride;  
+                        long rowOffsetPrev = (long)(currentY - 1) * blockParams.Stride;
                         long rowOffsetCurrent = (long)currentY * blockParams.Stride;
-                        long rowOffsetNext = (long)(currentY + 1) * blockParams.Stride;  
+                        long rowOffsetNext = (long)(currentY + 1) * blockParams.Stride;
 
                         int startX = blockParams.StartX;
                         int pixelsToProcess = Math.Min(blockParams.BlockWidth, blockParams.ImageWidth - startX);
@@ -220,13 +218,13 @@ namespace NeonApp
                         byte* inputRowPrev = blockParams.OriginalPtr + rowOffsetPrev + (startX * 4);
                         byte* inputRowCurrent = blockParams.OriginalPtr + rowOffsetCurrent + (startX * 4);
                         byte* inputRowNext = blockParams.OriginalPtr + rowOffsetNext + (startX * 4);
-    
+
                         byte* tempOutput = stackalloc byte[32];
-                 
+
                         byte* outputRow = blockParams.EdgesPtr + rowOffsetCurrent + (startX * 4);
                         DetectEdges(inputRowPrev, inputRowCurrent, inputRowNext, tempOutput);
-   
-                        for (int i = 8; i < 32; i++) 
+
+                        for (int i = 8; i < 32; i++)
                         {
                             outputRow[i] = tempOutput[i];
                         }
@@ -265,7 +263,7 @@ namespace NeonApp
                         byte* outputRow = blockParams.EdgesPtr + rowOffsetCurrent + (startX * 4);
 
                         cSharp.DetectEdges(inputRowPrev, inputRowCurrent, inputRowNext, outputRow);
-      
+
                     }
                 }
                 catch (Exception ex)
@@ -275,8 +273,6 @@ namespace NeonApp
                 }
             }
         }
-
-
         private unsafe void Convert_Click(object sender, EventArgs e)
         {
             if (pictureBoxOriginal.Image == null)
@@ -318,22 +314,13 @@ namespace NeonApp
                 stopwatch.Stop();
                 timeLabel.Text = $"Processing time: {stopwatch.ElapsedMilliseconds}ms using {threadOptions[trackBarThreads.Value]} threads";
 
-                //if (pictureBoxNeon.Image != null)
-                //{
-                //    pictureBoxNeon.Image.Dispose();
-                //}
-                // Step 2: Apply neon glow effect
-                Color neonColor = Color.FromArgb(255, 0, 255);  // Magenta neon color
-                                                                
-                                                                // Color.FromArgb(0, 255, 255) for cyan
-                                                                // Color.FromArgb(255, 255, 0) for yellow
-                                                                // Color.FromArgb(0, 255, 0) for green
-                                                                // Color.FromArgb(255, 128, 0) for orange
+                //Color neonColor = Color.FromArgb(255, 0, 255);
 
-                ApplyGlowEffect(edges, result, neonColor);
 
-                stopwatch.Stop();
-                timeLabel.Text = $"Processing time: {stopwatch.ElapsedMilliseconds}ms using {threadOptions[trackBarThreads.Value]} threads";
+                ApplyGlowEffect(edges, result, selectedGlowColor);
+
+                //stopwatch.Stop();
+                //timeLabel.Text = $"Processing time: {stopwatch.ElapsedMilliseconds}ms using {threadOptions[trackBarThreads.Value]} threads";
 
                 if (pictureBoxNeon.Image != null)
                 {
@@ -342,13 +329,12 @@ namespace NeonApp
                 pictureBoxNeon.Image = (Bitmap)result.Clone();
             }
         }
-
         private void ApplyGlowEffect(Bitmap edges, Bitmap result, Color glowColor)
         {
             BitmapData edgesData = edges.LockBits(
-      new Rectangle(0, 0, edges.Width, edges.Height),
-      ImageLockMode.ReadOnly,
-      PixelFormat.Format32bppArgb);
+              new Rectangle(0, 0, edges.Width, edges.Height),
+              ImageLockMode.ReadOnly,
+              PixelFormat.Format32bppArgb);
 
             BitmapData resultData = result.LockBits(
                 new Rectangle(0, 0, result.Width, result.Height),
@@ -361,11 +347,11 @@ namespace NeonApp
                 int stride = edgesData.Stride;
                 int width = edges.Width;
                 int height = edges.Height;
-                int glowRadius = 4;  // Zmniejszony promień
-                double baseAlpha = 25.0;  // Zmniejszona intensywność
-                double distanceScale = 2.0;  // Szybszy spadek intensywności
+                int glowRadius = 4;
+                double baseAlpha = 25.0;
+                double distanceScale = 2.0;
 
-                // Przygotuj tablicę z wartościami alpha dla różnych odległości
+
                 double[] alphaValues = new double[glowRadius + 1];
                 for (int i = 0; i <= glowRadius; i++)
                 {
@@ -421,40 +407,9 @@ namespace NeonApp
             }
         }
 
-        private void TestsButton_Click(object sender, EventArgs e)
-        {
-            if (pictureBoxOriginal.Image == null)
-            {
-                MessageBox.Show("Please select an image first.");
-                return;
-            }
-            double[] averageTimes = new double[threadOptions.Length];
-            for (int i = 0; i < threadOptions.Length; i++)
-            {
-                Label currentLabel = this.Controls.Find($"t{threadOptions[i]}Asm", true).FirstOrDefault() as Label;
-                int numberOfThreadsTests = threadOptions[i];
-                long totalTime = 0;
-                for (int j = 0; j < 10; j++)
-                {
+     
 
-
-                    var stopwatch = new System.Diagnostics.Stopwatch();
-                    stopwatch.Start();
-
-                    Convert_Click(null, null);
-
-                    stopwatch.Stop();
-                    totalTime += stopwatch.ElapsedMilliseconds;
-
-                    Application.DoEvents();
-                }
-                double averageTime = totalTime / 10.0;
-                averageTimes[i] = averageTime;
-                currentLabel.Text = $"{threadOptions[i]} threads: {averageTime:F2}ms";
-            }
-        }
-
-        private void button1_Click(object sender, EventArgs e)
+        private void svaeButton_Click(object sender, EventArgs e)
         {
             if (pictureBoxNeon.Image == null)
             {
@@ -499,5 +454,34 @@ namespace NeonApp
                 }
             }
         }
+
+
+
+        private void RadioButton_CheckedChanged(object sender, EventArgs e)
+        {
+            if (sender is RadioButton rb && rb.Checked)
+            {
+                switch (rb.Name)
+                {
+                    case "radioButton1":
+                        selectedGlowColor = Color.FromArgb(255, 0, 255); // Pink
+                        break;
+                    case "radioButton2":
+                        selectedGlowColor = Color.FromArgb(0, 255, 0);   // Green
+                        break;
+                    case "radioButton3":
+                        selectedGlowColor = Color.FromArgb(0, 255, 255); // Cyan
+                        break;
+                    case "radioButton4":
+                        selectedGlowColor = Color.FromArgb(255, 165, 0); // Orange
+                        break;
+                    case "radioButton5":
+                        selectedGlowColor = Color.FromArgb(255, 255, 0); // Yellow
+                        break;
+                }
+            }
+        }
+
+      
     }
 }

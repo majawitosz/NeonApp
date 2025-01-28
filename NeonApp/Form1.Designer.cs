@@ -35,33 +35,32 @@ namespace NeonApp
             chooseImage = new Button();
             imagePathTextBox = new TextBox();
             chosenImage = new PictureBox();
+            convert = new Button();
             trackBarThreads = new TrackBar();
             threadLabel = new Label();
             flowLayoutPanel2 = new FlowLayoutPanel();
-            timeLabel = new Label();
-            pictureBoxNeon = new PictureBox();
-            pictureBoxOriginal = new PictureBox();
-            label2 = new Label();
-            labelOriginal = new Label();
-            convert = new Button();
-            t1Asm = new Label();
-            t2Asm = new Label();
-            t4Asm = new Label();
-            t8Asm = new Label();
-            t16Asm = new Label();
-            t32Asm = new Label();
-            t64Asm = new Label();
-            TestsButton = new Button();
             restoreDefault = new Button();
+            timeLabel = new Label();
             cSharp_radioBtn = new RadioButton();
             asm_radioBtn = new RadioButton();
-            button1 = new Button();
+            saveButton = new Button();
+            pictureBoxNeon = new PictureBox();
+            pictureBoxOriginal = new PictureBox();
+            neonLabel = new Label();
+            labelOriginal = new Label();
+            radioButton1 = new RadioButton();
+            colorPicker = new GroupBox();
+            radioButton5 = new RadioButton();
+            radioButton4 = new RadioButton();
+            radioButton3 = new RadioButton();
+            radioButton2 = new RadioButton();
             flowLayoutPanel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)chosenImage).BeginInit();
             ((System.ComponentModel.ISupportInitialize)trackBarThreads).BeginInit();
             flowLayoutPanel2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)pictureBoxNeon).BeginInit();
             ((System.ComponentModel.ISupportInitialize)pictureBoxOriginal).BeginInit();
+            colorPicker.SuspendLayout();
             SuspendLayout();
             // 
             // openFileDialog1
@@ -73,7 +72,7 @@ namespace NeonApp
             flowLayoutPanel1.Controls.Add(chooseImage);
             flowLayoutPanel1.Controls.Add(imagePathTextBox);
             flowLayoutPanel1.Controls.Add(chosenImage);
-            flowLayoutPanel1.Location = new Point(14, 481);
+            flowLayoutPanel1.Location = new Point(31, 431);
             flowLayoutPanel1.Margin = new Padding(4, 3, 4, 3);
             flowLayoutPanel1.Name = "flowLayoutPanel1";
             flowLayoutPanel1.Size = new Size(233, 256);
@@ -108,9 +107,20 @@ namespace NeonApp
             chosenImage.TabIndex = 1;
             chosenImage.TabStop = false;
             // 
+            // convert
+            // 
+            convert.Location = new Point(661, 576);
+            convert.Margin = new Padding(4, 3, 4, 3);
+            convert.Name = "convert";
+            convert.Size = new Size(200, 27);
+            convert.TabIndex = 8;
+            convert.Text = "Convert";
+            convert.UseVisualStyleBackColor = true;
+            convert.Click += Convert_Click;
+            // 
             // trackBarThreads
             // 
-            trackBarThreads.Location = new Point(4, 18);
+            trackBarThreads.Location = new Point(4, 63);
             trackBarThreads.Margin = new Padding(4, 3, 4, 3);
             trackBarThreads.Maximum = 0;
             trackBarThreads.Name = "trackBarThreads";
@@ -120,7 +130,7 @@ namespace NeonApp
             // 
             // threadLabel
             // 
-            threadLabel.Location = new Point(4, 0);
+            threadLabel.Location = new Point(4, 45);
             threadLabel.Margin = new Padding(4, 0, 4, 0);
             threadLabel.Name = "threadLabel";
             threadLabel.Size = new Size(331, 15);
@@ -129,24 +139,73 @@ namespace NeonApp
             // 
             // flowLayoutPanel2
             // 
+            flowLayoutPanel2.Controls.Add(restoreDefault);
             flowLayoutPanel2.Controls.Add(threadLabel);
             flowLayoutPanel2.Controls.Add(trackBarThreads);
             flowLayoutPanel2.Controls.Add(timeLabel);
-            flowLayoutPanel2.Location = new Point(550, 471);
+            flowLayoutPanel2.Location = new Point(504, 438);
             flowLayoutPanel2.Margin = new Padding(4, 3, 4, 3);
             flowLayoutPanel2.Name = "flowLayoutPanel2";
-            flowLayoutPanel2.Size = new Size(335, 141);
+            flowLayoutPanel2.Size = new Size(357, 136);
             flowLayoutPanel2.TabIndex = 3;
+            // 
+            // restoreDefault
+            // 
+            restoreDefault.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+            restoreDefault.Location = new Point(4, 3);
+            restoreDefault.Margin = new Padding(4, 3, 4, 15);
+            restoreDefault.Name = "restoreDefault";
+            restoreDefault.Size = new Size(144, 27);
+            restoreDefault.TabIndex = 17;
+            restoreDefault.Text = "Restore Default";
+            restoreDefault.UseVisualStyleBackColor = true;
+            restoreDefault.Click += restoreDefault_Click;
             // 
             // timeLabel
             // 
             timeLabel.AutoSize = true;
-            timeLabel.Location = new Point(4, 66);
+            timeLabel.Location = new Point(4, 111);
             timeLabel.Margin = new Padding(4, 0, 4, 0);
             timeLabel.Name = "timeLabel";
             timeLabel.Size = new Size(36, 15);
             timeLabel.TabIndex = 3;
             timeLabel.Text = "Time:";
+            // 
+            // cSharp_radioBtn
+            // 
+            cSharp_radioBtn.AutoSize = true;
+            cSharp_radioBtn.Location = new Point(508, 605);
+            cSharp_radioBtn.Margin = new Padding(4, 3, 4, 3);
+            cSharp_radioBtn.Name = "cSharp_radioBtn";
+            cSharp_radioBtn.Size = new Size(79, 19);
+            cSharp_radioBtn.TabIndex = 19;
+            cSharp_radioBtn.TabStop = true;
+            cSharp_radioBtn.Text = "C# Library";
+            cSharp_radioBtn.UseVisualStyleBackColor = true;
+            cSharp_radioBtn.CheckedChanged += cSharp_radioBtn_CheckedChanged;
+            // 
+            // asm_radioBtn
+            // 
+            asm_radioBtn.AutoSize = true;
+            asm_radioBtn.Location = new Point(508, 580);
+            asm_radioBtn.Margin = new Padding(4, 3, 4, 3);
+            asm_radioBtn.Name = "asm_radioBtn";
+            asm_radioBtn.Size = new Size(110, 19);
+            asm_radioBtn.TabIndex = 20;
+            asm_radioBtn.TabStop = true;
+            asm_radioBtn.Text = "ASM x64 Library";
+            asm_radioBtn.UseVisualStyleBackColor = true;
+            asm_radioBtn.CheckedChanged += asm_radioBtn_CheckedChanged;
+            // 
+            // saveButton
+            // 
+            saveButton.Location = new Point(661, 609);
+            saveButton.Name = "saveButton";
+            saveButton.Size = new Size(200, 27);
+            saveButton.TabIndex = 21;
+            saveButton.Text = "Save Image";
+            saveButton.UseVisualStyleBackColor = true;
+            saveButton.Click += svaeButton_Click;
             // 
             // pictureBoxNeon
             // 
@@ -163,21 +222,21 @@ namespace NeonApp
             pictureBoxOriginal.Location = new Point(31, 55);
             pictureBoxOriginal.Margin = new Padding(4, 3, 4, 3);
             pictureBoxOriginal.Name = "pictureBoxOriginal";
-            pictureBoxOriginal.Size = new Size(402, 354);
+            pictureBoxOriginal.Size = new Size(411, 354);
             pictureBoxOriginal.SizeMode = PictureBoxSizeMode.Zoom;
             pictureBoxOriginal.TabIndex = 5;
             pictureBoxOriginal.TabStop = false;
             // 
-            // label2
+            // neonLabel
             // 
-            label2.AutoSize = true;
-            label2.Font = new Font("Impact", 21.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            label2.Location = new Point(601, 10);
-            label2.Margin = new Padding(4, 0, 4, 0);
-            label2.Name = "label2";
-            label2.Size = new Size(157, 36);
-            label2.TabIndex = 6;
-            label2.Text = "NEON EFFECT";
+            neonLabel.AutoSize = true;
+            neonLabel.Font = new Font("Impact", 21.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            neonLabel.Location = new Point(601, 10);
+            neonLabel.Margin = new Padding(4, 0, 4, 0);
+            neonLabel.Name = "neonLabel";
+            neonLabel.Size = new Size(157, 36);
+            neonLabel.TabIndex = 6;
+            neonLabel.Text = "NEON EFFECT";
             // 
             // labelOriginal
             // 
@@ -191,168 +250,112 @@ namespace NeonApp
             labelOriginal.TabIndex = 7;
             labelOriginal.Text = "ORIGINAL";
             // 
-            // convert
+            // radioButton1
             // 
-            convert.Location = new Point(394, 500);
-            convert.Margin = new Padding(4, 3, 4, 3);
-            convert.Name = "convert";
-            convert.Size = new Size(88, 27);
-            convert.TabIndex = 8;
-            convert.Text = "Convert";
-            convert.UseVisualStyleBackColor = true;
-            convert.Click += Convert_Click;
+            radioButton1.AutoSize = true;
+            radioButton1.BackColor = SystemColors.ButtonHighlight;
+            radioButton1.Image = Properties.Resources.pink;
+            radioButton1.ImageAlign = ContentAlignment.MiddleRight;
+            radioButton1.Location = new Point(6, 22);
+            radioButton1.Name = "radioButton1";
+            radioButton1.Padding = new Padding(0, 0, 0, 1);
+            radioButton1.Size = new Size(68, 21);
+            radioButton1.TabIndex = 21;
+            radioButton1.TabStop = true;
+            radioButton1.Text = "Pink";
+            radioButton1.TextImageRelation = TextImageRelation.ImageBeforeText;
+            radioButton1.UseVisualStyleBackColor = false;
+            radioButton1.CheckedChanged += RadioButton_CheckedChanged;
             // 
-            // t1Asm
+            // colorPicker
             // 
-            t1Asm.AutoSize = true;
-            t1Asm.Location = new Point(391, 584);
-            t1Asm.Margin = new Padding(4, 0, 4, 0);
-            t1Asm.Name = "t1Asm";
-            t1Asm.Size = new Size(38, 15);
-            t1Asm.TabIndex = 9;
-            t1Asm.Text = "label1";
+            colorPicker.Controls.Add(radioButton5);
+            colorPicker.Controls.Add(radioButton4);
+            colorPicker.Controls.Add(radioButton3);
+            colorPicker.Controls.Add(radioButton2);
+            colorPicker.Controls.Add(radioButton1);
+            colorPicker.Location = new Point(284, 431);
+            colorPicker.Name = "colorPicker";
+            colorPicker.Size = new Size(200, 148);
+            colorPicker.TabIndex = 22;
+            colorPicker.TabStop = false;
+            colorPicker.Text = "Color Picker";
             // 
-            // t2Asm
+            // radioButton5
             // 
-            t2Asm.AutoSize = true;
-            t2Asm.Location = new Point(393, 599);
-            t2Asm.Margin = new Padding(4, 0, 4, 0);
-            t2Asm.Name = "t2Asm";
-            t2Asm.Size = new Size(38, 15);
-            t2Asm.TabIndex = 10;
-            t2Asm.Text = "label1";
+            radioButton5.AutoSize = true;
+            radioButton5.Image = Properties.Resources.yellow;
+            radioButton5.Location = new Point(6, 122);
+            radioButton5.Name = "radioButton5";
+            radioButton5.Padding = new Padding(0, 0, 0, 1);
+            radioButton5.Size = new Size(79, 21);
+            radioButton5.TabIndex = 25;
+            radioButton5.TabStop = true;
+            radioButton5.Text = "Yellow";
+            radioButton5.TextImageRelation = TextImageRelation.ImageBeforeText;
+            radioButton5.UseVisualStyleBackColor = true;
+            radioButton5.CheckedChanged += RadioButton_CheckedChanged;
             // 
-            // t4Asm
+            // radioButton4
             // 
-            t4Asm.AutoSize = true;
-            t4Asm.Location = new Point(393, 614);
-            t4Asm.Margin = new Padding(4, 0, 4, 0);
-            t4Asm.Name = "t4Asm";
-            t4Asm.Size = new Size(38, 15);
-            t4Asm.TabIndex = 11;
-            t4Asm.Text = "label1";
+            radioButton4.AutoSize = true;
+            radioButton4.Image = Properties.Resources.orange;
+            radioButton4.Location = new Point(6, 97);
+            radioButton4.Name = "radioButton4";
+            radioButton4.Padding = new Padding(0, 0, 0, 1);
+            radioButton4.Size = new Size(84, 21);
+            radioButton4.TabIndex = 24;
+            radioButton4.TabStop = true;
+            radioButton4.Text = "Orange";
+            radioButton4.TextImageRelation = TextImageRelation.ImageBeforeText;
+            radioButton4.UseVisualStyleBackColor = true;
+            radioButton4.CheckedChanged += RadioButton_CheckedChanged;
             // 
-            // t8Asm
+            // radioButton3
             // 
-            t8Asm.AutoSize = true;
-            t8Asm.Location = new Point(393, 629);
-            t8Asm.Margin = new Padding(4, 0, 4, 0);
-            t8Asm.Name = "t8Asm";
-            t8Asm.Size = new Size(38, 15);
-            t8Asm.TabIndex = 12;
-            t8Asm.Text = "label1";
+            radioButton3.AutoSize = true;
+            radioButton3.Image = Properties.Resources.cyan;
+            radioButton3.Location = new Point(6, 72);
+            radioButton3.Name = "radioButton3";
+            radioButton3.Padding = new Padding(0, 0, 0, 1);
+            radioButton3.Size = new Size(72, 21);
+            radioButton3.TabIndex = 23;
+            radioButton3.TabStop = true;
+            radioButton3.Text = "Cyan";
+            radioButton3.TextImageRelation = TextImageRelation.ImageBeforeText;
+            radioButton3.UseVisualStyleBackColor = true;
+            radioButton3.CheckedChanged += RadioButton_CheckedChanged;
             // 
-            // t16Asm
+            // radioButton2
             // 
-            t16Asm.AutoSize = true;
-            t16Asm.Location = new Point(391, 644);
-            t16Asm.Margin = new Padding(4, 0, 4, 0);
-            t16Asm.Name = "t16Asm";
-            t16Asm.Size = new Size(38, 15);
-            t16Asm.TabIndex = 13;
-            t16Asm.Text = "label1";
-            // 
-            // t32Asm
-            // 
-            t32Asm.AutoSize = true;
-            t32Asm.Location = new Point(393, 659);
-            t32Asm.Margin = new Padding(4, 0, 4, 0);
-            t32Asm.Name = "t32Asm";
-            t32Asm.Size = new Size(38, 15);
-            t32Asm.TabIndex = 14;
-            t32Asm.Text = "label1";
-            // 
-            // t64Asm
-            // 
-            t64Asm.AutoSize = true;
-            t64Asm.Location = new Point(393, 674);
-            t64Asm.Margin = new Padding(4, 0, 4, 0);
-            t64Asm.Name = "t64Asm";
-            t64Asm.Size = new Size(38, 15);
-            t64Asm.TabIndex = 15;
-            t64Asm.Text = "label1";
-            // 
-            // TestsButton
-            // 
-            TestsButton.Location = new Point(397, 554);
-            TestsButton.Margin = new Padding(4, 3, 4, 3);
-            TestsButton.Name = "TestsButton";
-            TestsButton.Size = new Size(88, 27);
-            TestsButton.TabIndex = 16;
-            TestsButton.Text = "Run tests";
-            TestsButton.UseVisualStyleBackColor = true;
-            TestsButton.Click += TestsButton_Click;
-            // 
-            // restoreDefault
-            // 
-            restoreDefault.Location = new Point(550, 437);
-            restoreDefault.Margin = new Padding(4, 3, 4, 3);
-            restoreDefault.Name = "restoreDefault";
-            restoreDefault.Size = new Size(145, 27);
-            restoreDefault.TabIndex = 17;
-            restoreDefault.Text = "Restore Default";
-            restoreDefault.UseVisualStyleBackColor = true;
-            restoreDefault.Click += restoreDefault_Click;
-            // 
-            // cSharp_radioBtn
-            // 
-            cSharp_radioBtn.AutoSize = true;
-            cSharp_radioBtn.Location = new Point(622, 642);
-            cSharp_radioBtn.Margin = new Padding(4, 3, 4, 3);
-            cSharp_radioBtn.Name = "cSharp_radioBtn";
-            cSharp_radioBtn.Size = new Size(79, 19);
-            cSharp_radioBtn.TabIndex = 19;
-            cSharp_radioBtn.TabStop = true;
-            cSharp_radioBtn.Text = "C# Library";
-            cSharp_radioBtn.UseVisualStyleBackColor = true;
-            cSharp_radioBtn.CheckedChanged += cSharp_radioBtn_CheckedChanged;
-            // 
-            // asm_radioBtn
-            // 
-            asm_radioBtn.AutoSize = true;
-            asm_radioBtn.Location = new Point(622, 674);
-            asm_radioBtn.Margin = new Padding(4, 3, 4, 3);
-            asm_radioBtn.Name = "asm_radioBtn";
-            asm_radioBtn.Size = new Size(110, 19);
-            asm_radioBtn.TabIndex = 20;
-            asm_radioBtn.TabStop = true;
-            asm_radioBtn.Text = "ASM x64 Library";
-            asm_radioBtn.UseVisualStyleBackColor = true;
-            asm_radioBtn.CheckedChanged += asm_radioBtn_CheckedChanged;
-            // 
-            // button1
-            // 
-            button1.Location = new Point(309, 444);
-            button1.Name = "button1";
-            button1.Size = new Size(75, 23);
-            button1.TabIndex = 21;
-            button1.Text = "button1";
-            button1.UseVisualStyleBackColor = true;
-            button1.Click += button1_Click;
+            radioButton2.AutoSize = true;
+            radioButton2.Image = Properties.Resources.green;
+            radioButton2.Location = new Point(6, 47);
+            radioButton2.Name = "radioButton2";
+            radioButton2.Padding = new Padding(0, 0, 0, 1);
+            radioButton2.Size = new Size(76, 21);
+            radioButton2.TabIndex = 22;
+            radioButton2.TabStop = true;
+            radioButton2.Text = "Green";
+            radioButton2.TextImageRelation = TextImageRelation.ImageBeforeText;
+            radioButton2.UseVisualStyleBackColor = true;
+            radioButton2.CheckedChanged += RadioButton_CheckedChanged;
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = SystemColors.ButtonHighlight;
-            ClientSize = new Size(915, 763);
-            Controls.Add(button1);
-            Controls.Add(asm_radioBtn);
+            ClientSize = new Size(915, 706);
             Controls.Add(cSharp_radioBtn);
-            Controls.Add(restoreDefault);
-            Controls.Add(TestsButton);
-            Controls.Add(t64Asm);
-            Controls.Add(t32Asm);
-            Controls.Add(t16Asm);
-            Controls.Add(t8Asm);
-            Controls.Add(t4Asm);
-            Controls.Add(t2Asm);
-            Controls.Add(t1Asm);
-            Controls.Add(convert);
+            Controls.Add(colorPicker);
+            Controls.Add(asm_radioBtn);
+            Controls.Add(saveButton);
             Controls.Add(labelOriginal);
-            Controls.Add(label2);
+            Controls.Add(neonLabel);
             Controls.Add(pictureBoxOriginal);
             Controls.Add(pictureBoxNeon);
+            Controls.Add(convert);
             Controls.Add(flowLayoutPanel2);
             Controls.Add(flowLayoutPanel1);
             FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -367,6 +370,8 @@ namespace NeonApp
             flowLayoutPanel2.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)pictureBoxNeon).EndInit();
             ((System.ComponentModel.ISupportInitialize)pictureBoxOriginal).EndInit();
+            colorPicker.ResumeLayout(false);
+            colorPicker.PerformLayout();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -386,20 +391,18 @@ namespace NeonApp
         private System.Windows.Forms.Label timeLabel;
         private System.Windows.Forms.PictureBox pictureBoxNeon;
         private System.Windows.Forms.PictureBox pictureBoxOriginal;
-        private System.Windows.Forms.Label label2;
+        private System.Windows.Forms.Label neonLabel;
         private System.Windows.Forms.Label labelOriginal;
         private Button convert;
-        private Label t1Asm;
-        private Label t2Asm;
-        private Label t4Asm;
-        private Label t8Asm;
-        private Label t16Asm;
-        private Label t32Asm;
-        private Label t64Asm;
-        private Button TestsButton;
         private Button restoreDefault;
         private RadioButton cSharp_radioBtn;
         private RadioButton asm_radioBtn;
-        private Button button1;
+        private Button saveButton;
+        private RadioButton radioButton1;
+        private GroupBox colorPicker;
+        private RadioButton radioButton4;
+        private RadioButton radioButton3;
+        private RadioButton radioButton2;
+        private RadioButton radioButton5;
     }
 }
