@@ -2,48 +2,65 @@
 {
     public unsafe class EdgeDetection
     {
+        private const float R_WEIGHT = 0.299f;
+        private const float G_WEIGHT = 0.587f;
+        private const float B_WEIGHT = 0.114f;
+        private const int THRESHOLD = 80;
 
-        private const int THRESHOLD = 15;
-        private const uint ALPHA_MASK = 0xFF000000;
-        private const uint WHITE_PIXEL = 0xFFFFFFFF;
-        private const uint BLACK_PIXEL = 0xFF000000;
-        public int DetectEdges(byte* inputPixels, byte* outputPixels, int length)
+        // Sobel operators
+        private static readonly int[] GX = { -1, 0, 1,
+                                           -2, 0, 2,
+                                           -1, 0, 1 };
+
+        private static readonly int[] GY = { -1, -2, -1,
+                                            0,  0,  0,
+                                            1,  2,  1 };
+
+        public void DetectEdges(byte* inputRowPrev, byte* inputRowCurrent, byte* inputRowNext, byte* outputRow)
         {
-            for (int i = 0; i < length - 1; i++)
+            // Process 6 pixels at a time
+            for (int x = 0; x < 6; x++)
             {
-                int currentOffset = i * 4;
-                int nextOffset = (i + 1) * 4;
+                float[] grayValues = new float[9]; // 3x3 window
+                int pixelIndex = 0;
 
-                // Extract current pixel components
-                byte currentBlue = inputPixels[currentOffset];
-                byte currentGreen = inputPixels[currentOffset + 1];
-                byte currentRed = inputPixels[currentOffset + 2];
+                // Collect grayscale values for 3x3 window
+                for (int row = -1; row <= 1; row++)
+                {
+                    byte* currentRow;
+                    if (row == -1) currentRow = inputRowPrev;
+                    else if (row == 0) currentRow = inputRowCurrent;
+                    else currentRow = inputRowNext;
 
-                // Extract next pixel components
-                byte nextBlue = inputPixels[nextOffset];
-                byte nextGreen = inputPixels[nextOffset + 1];
-                byte nextRed = inputPixels[nextOffset + 2];
+                    for (int col = -1; col <= 1; col++)
+                    {
+                        int offset = (x + col + 1) * 4;
+                        byte b = currentRow[offset];
+                        byte g = currentRow[offset + 1];
+                        byte r = currentRow[offset + 2];
 
-                // Calculate absolute differences
-                int blueDiff = Math.Abs(currentBlue - nextBlue);
-                int greenDiff = Math.Abs(currentGreen - nextGreen);
-                int redDiff = Math.Abs(currentRed - nextRed);
+                        grayValues[pixelIndex++] = r * R_WEIGHT + g * G_WEIGHT + b * B_WEIGHT;
+                    }
+                }
 
-                // Sum up the differences
-                int totalDiff = blueDiff + greenDiff + redDiff;
+                // Calculate Sobel gradients
+                float gx = 0, gy = 0;
+                for (int i = 0; i < 9; i++)
+                {
+                    gx += grayValues[i] * GX[i];
+                    gy += grayValues[i] * GY[i];
+                }
 
-                // Compare with threshold and set output pixel
-                uint outputColor = totalDiff > THRESHOLD ? WHITE_PIXEL : BLACK_PIXEL;
+                // Calculate magnitude
+                float magnitude = (float)Math.Sqrt(gx * gx + gy * gy);
 
-                // Store result
-                *(uint*)(outputPixels + currentOffset) = outputColor;
+                // Apply threshold
+                uint outputColor = magnitude > THRESHOLD ? 0xFFFFFFFF : 0xFF000000;
+
+                // Write output
+                int outputOffset = x * 4;
+                *(uint*)(outputRow + outputOffset) = outputColor;
             }
-
-            // Handle the last pixel
-            int lastOffset = (length - 1) * 4;
-            *(uint*)(outputPixels + lastOffset) = BLACK_PIXEL;
-
-            return 0;
         }
     }
 }

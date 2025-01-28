@@ -2,13 +2,14 @@
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using CSharp;
+using static System.Windows.Forms.AxHost;
 
 namespace NeonApp
 {
     public unsafe partial class Form1 : Form
     {
 
-        [DllImport(@"C:\Users\Maja\source\repos\NeonApp\x64\Debug\Asm.dll")]
+        [DllImport(@"C:\Users\Maja\source\repos\NeonApp\x64\Release\Asm.dll")]
         static extern void DetectEdges(byte* inputRowPrev, byte* inputRowCurrent, byte* inputRowNext,
         byte* outputPixels);
 
@@ -185,30 +186,25 @@ namespace NeonApp
                         if (currentY == 0 || currentY == blockParams.ImageHeight - 1)
                             continue;
 
-                        long rowOffsetPrev = (long)(currentY - 1) * blockParams.Stride;  // Wiersz powyżej
+                        long rowOffsetPrev = (long)(currentY - 1) * blockParams.Stride;  
                         long rowOffsetCurrent = (long)currentY * blockParams.Stride;
-                        long rowOffsetNext = (long)(currentY + 1) * blockParams.Stride;  // Wiersz poniżej
+                        long rowOffsetNext = (long)(currentY + 1) * blockParams.Stride;  
 
                         int startX = blockParams.StartX;
-
-                        //int pixelsToProcess = Math.Min(blockParams.BlockWidth, blockParams.ImageWidth - startX);
-
-                        //if (startX == 0 || startX + 6 >= blockParams.ImageWidth)
-                        //    continue;
+                        int pixelsToProcess = Math.Min(blockParams.BlockWidth, blockParams.ImageWidth - startX);
+                        if (startX == 0 || startX + pixelsToProcess == blockParams.ImageWidth)
+                            continue;
 
                         byte* inputRowPrev = blockParams.OriginalPtr + rowOffsetPrev + (startX * 4);
                         byte* inputRowCurrent = blockParams.OriginalPtr + rowOffsetCurrent + (startX * 4);
                         byte* inputRowNext = blockParams.OriginalPtr + rowOffsetNext + (startX * 4);
-                        // byte* outputRow = blockParams.EdgesPtr + rowOffsetCurrent + (startX * 4);
-
+    
                         byte* tempOutput = stackalloc byte[32];
-                        
-
-
-                        DetectEdges(inputRowPrev, inputRowCurrent, inputRowNext, tempOutput);
+                 
                         byte* outputRow = blockParams.EdgesPtr + rowOffsetCurrent + (startX * 4);
-
-                        for (int i = 8; i < 32; i++) // 6 pikseli * 4 bajty = 24 bajty <=???
+                        DetectEdges(inputRowPrev, inputRowCurrent, inputRowNext, tempOutput);
+   
+                        for (int i = 8; i < 32; i++) 
                         {
                             outputRow[i] = tempOutput[i];
                         }
@@ -227,34 +223,27 @@ namespace NeonApp
                 {
                     for (int y = 0; y < blockParams.BlockHeight; y++)
                     {
+
                         int currentY = blockParams.StartY + y;
-                        if (currentY >= blockParams.ImageHeight) continue;
-
-
-                        long rowOffset = (long)currentY * blockParams.Stride;
-                        int startX = blockParams.StartX;
-                        int pixelsToProcess = Math.Min(blockParams.BlockWidth,
-                            blockParams.ImageWidth - startX);
-
-                        if (pixelsToProcess <= 0) continue;
-
-                        // Sprawdzenie czy nie wykraczamy poza granice
-                        if (startX + pixelsToProcess > blockParams.ImageWidth)
+                        if (currentY == 0 || currentY == blockParams.ImageHeight - 1)
                             continue;
 
-                        // Bezpieczne obliczenie offsetów
-                        byte* inputRow = blockParams.OriginalPtr + rowOffset + (startX * 4);
-                        byte* outputRow = blockParams.EdgesPtr + rowOffset + (startX * 4);
+                        long rowOffsetPrev = (long)(currentY - 1) * blockParams.Stride;  // Wiersz powyżej
+                        long rowOffsetCurrent = (long)currentY * blockParams.Stride;
+                        long rowOffsetNext = (long)(currentY + 1) * blockParams.Stride;  // Wiersz poniżej
 
-                        // Upewniamy się, że długość jest wielokrotnością 4 (dla SIMD)
-                        int alignedLength = (pixelsToProcess + 3) & ~3;
+                        int startX = blockParams.StartX;
+                        int pixelsToProcess = Math.Min(blockParams.BlockWidth, blockParams.ImageWidth - startX);
+                        if (startX == 0 || startX + pixelsToProcess == blockParams.ImageWidth)
+                            continue;
+                        byte* inputRowPrev = blockParams.OriginalPtr + rowOffsetPrev + (startX * 4);
+                        byte* inputRowCurrent = blockParams.OriginalPtr + rowOffsetCurrent + (startX * 4);
+                        byte* inputRowNext = blockParams.OriginalPtr + rowOffsetNext + (startX * 4);
+                        byte* tempOutput = stackalloc byte[32];
+                        byte* outputRow = blockParams.EdgesPtr + rowOffsetCurrent + (startX * 4);
 
-                        // Przetwarzamy cały wiersz bloku na raz
-                        cSharp.DetectEdges(
-                            inputRow,
-                            outputRow,
-                            alignedLength
-                        );
+                        cSharp.DetectEdges(inputRowPrev, inputRowCurrent, inputRowNext, outputRow);
+      
                     }
                 }
                 catch (Exception ex)
@@ -280,6 +269,7 @@ namespace NeonApp
 
             using (Bitmap original = new Bitmap(pictureBoxOriginal.Image))
             using (Bitmap edges = new Bitmap(original.Width, original.Height))
+            using (Bitmap result = new Bitmap(original))
             {
                 BitmapData originalData = original.LockBits(
                    new Rectangle(0, 0, original.Width, original.Height),
@@ -306,32 +296,37 @@ namespace NeonApp
                 stopwatch.Stop();
                 timeLabel.Text = $"Processing time: {stopwatch.ElapsedMilliseconds}ms using {threadOptions[trackBarThreads.Value]} threads";
 
-                if (pictureBoxNeon.Image != null)
-                {
-                    pictureBoxNeon.Image.Dispose();
-                }
-                pictureBoxNeon.Image = (Bitmap)edges.Clone();
-
-                //Bitmap result = new Bitmap(original);
-                //ApplyGlowEffect(edges, result, Color.FromArgb(255, 0, 255));
-
-                //stopwatch.Stop();
-                //timeLabel.Text = $"Processing time: {stopwatch.ElapsedMilliseconds}ms using {threadOptions[trackBarThreads.Value]} threads";
-
                 //if (pictureBoxNeon.Image != null)
                 //{
                 //    pictureBoxNeon.Image.Dispose();
                 //}
-                //pictureBoxNeon.Image = result;
+                // Step 2: Apply neon glow effect
+                Color neonColor = Color.FromArgb(255, 0, 255);  // Magenta neon color
+                                                                
+                                                                // Color.FromArgb(0, 255, 255) for cyan
+                                                                // Color.FromArgb(255, 255, 0) for yellow
+                                                                // Color.FromArgb(0, 255, 0) for green
+                                                                // Color.FromArgb(255, 128, 0) for orange
+
+                ApplyGlowEffect(edges, result, neonColor);
+
+                stopwatch.Stop();
+                timeLabel.Text = $"Processing time: {stopwatch.ElapsedMilliseconds}ms using {threadOptions[trackBarThreads.Value]} threads";
+
+                if (pictureBoxNeon.Image != null)
+                {
+                    pictureBoxNeon.Image.Dispose();
+                }
+                pictureBoxNeon.Image = (Bitmap)result.Clone();
             }
         }
 
         private void ApplyGlowEffect(Bitmap edges, Bitmap result, Color glowColor)
         {
             BitmapData edgesData = edges.LockBits(
-                new Rectangle(0, 0, edges.Width, edges.Height),
-                ImageLockMode.ReadOnly,
-                PixelFormat.Format32bppArgb);
+      new Rectangle(0, 0, edges.Width, edges.Height),
+      ImageLockMode.ReadOnly,
+      PixelFormat.Format32bppArgb);
 
             BitmapData resultData = result.LockBits(
                 new Rectangle(0, 0, result.Width, result.Height),
@@ -339,45 +334,58 @@ namespace NeonApp
                 PixelFormat.Format32bppArgb);
             try
             {
-                unsafe
+                byte* ptrEdges = (byte*)edgesData.Scan0;
+                byte* ptrResult = (byte*)resultData.Scan0;
+                int stride = edgesData.Stride;
+                int width = edges.Width;
+                int height = edges.Height;
+                int glowRadius = 4;  // Zmniejszony promień
+                double baseAlpha = 25.0;  // Zmniejszona intensywność
+                double distanceScale = 2.0;  // Szybszy spadek intensywności
+
+                // Przygotuj tablicę z wartościami alpha dla różnych odległości
+                double[] alphaValues = new double[glowRadius + 1];
+                for (int i = 0; i <= glowRadius; i++)
                 {
-                    byte* ptrEdges = (byte*)edgesData.Scan0;
-                    byte* ptrResult = (byte*)resultData.Scan0;
-                    int stride = edgesData.Stride;
-                    int width = edges.Width;
-                    int height = edges.Height;
-                    int glowRadius = 6;
-                    double baseAlpha = 40.0;
-                    double distanceScale = 4.0;
+                    alphaValues[i] = baseAlpha * Math.Exp(-i / distanceScale);
+                }
 
-                    for (int y = glowRadius; y < height - glowRadius; y++)
+                for (int y = glowRadius; y < height - glowRadius; y++)
+                {
+                    byte* row = ptrEdges + (y * stride);
+                    byte* resultRow = ptrResult + (y * stride);
+
+                    for (int x = glowRadius; x < width - glowRadius; x++)
                     {
-                        byte* row = ptrEdges + (y * stride);
-                        byte* resultRow = ptrResult + (y * stride);
-
-                        for (int x = glowRadius; x < width - glowRadius; x++)
+                        int pixelOffset = x * 4;
+                        if (row[pixelOffset + 2] > 250)  // Wykryta krawędź
                         {
-                            int pixelOffset = x * 4;
-                            if (row[pixelOffset + 2] > 250)
+                            // Uproszczona wersja nakładania poświaty
+                            for (int i = -glowRadius; i <= glowRadius; i += 1)
                             {
-                                for (int i = -glowRadius; i <= glowRadius; i++)
-                                {
-                                    for (int j = -glowRadius; j <= glowRadius; j++)
-                                    {
-                                        int newY = y + i;
-                                        int newX = x + j;
-                                        if (newX >= 0 && newX < width && newY >= 0 && newY < height)
-                                        {
-                                            int targetOffset = (newY * stride) + (newX * 4);
-                                            double distance = Math.Sqrt(i * i + j * j);
-                                            int alpha = (int)(baseAlpha * Math.Exp(-distance / distanceScale));
+                                int newY = y + i;
+                                if (newY < 0 || newY >= height) continue;
 
-                                            ptrResult[targetOffset] = (byte)Math.Min(255, ((ptrResult[targetOffset] * (255 - alpha) + glowColor.B * alpha) / 255));
-                                            ptrResult[targetOffset + 1] = (byte)Math.Min(255, ((ptrResult[targetOffset + 1] * (255 - alpha) + glowColor.G * alpha) / 255));
-                                            ptrResult[targetOffset + 2] = (byte)Math.Min(255, ((ptrResult[targetOffset + 2] * (255 - alpha) + glowColor.R * alpha) / 255));
-                                            ptrResult[targetOffset + 3] = 255;
-                                        }
-                                    }
+                                for (int j = -glowRadius; j <= glowRadius; j += 1)
+                                {
+                                    int newX = x + j;
+                                    if (newX < 0 || newX >= width) continue;
+
+                                    int distance = Math.Max(Math.Abs(i), Math.Abs(j));
+                                    if (distance > glowRadius) continue;
+
+                                    int targetOffset = (newY * stride) + (newX * 4);
+                                    double alpha = alphaValues[distance];
+
+                                    // Szybsze mieszanie kolorów
+                                    byte blendB = (byte)((ptrResult[targetOffset] * (255 - alpha) + glowColor.B * alpha) / 255);
+                                    byte blendG = (byte)((ptrResult[targetOffset + 1] * (255 - alpha) + glowColor.G * alpha) / 255);
+                                    byte blendR = (byte)((ptrResult[targetOffset + 2] * (255 - alpha) + glowColor.R * alpha) / 255);
+
+                                    ptrResult[targetOffset] = blendB;
+                                    ptrResult[targetOffset + 1] = blendG;
+                                    ptrResult[targetOffset + 2] = blendR;
+                                    ptrResult[targetOffset + 3] = 255;
                                 }
                             }
                         }

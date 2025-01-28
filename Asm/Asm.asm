@@ -7,7 +7,7 @@
     b_mask dd 8 dup(000000FFh)  
     white_pixel dd 8 dup(0FFFFFFFFh)
     AlphaMask dd 8 dup(0FF000000h)
-    treshold dd 8 dup(30)
+    treshold dd 8 dup(80)
     sobel_gx_tb dd 0, 0, 0, 0, 0, 1, 0, -1
     sobel_gx_m dd 0, 0, 0, 0, 0, 2, 0, -2
     sobel_gy_t dd 0, 0, 0, 0, 0, -1, -2, -1
@@ -111,6 +111,11 @@ DetectEdges proc
     mov r10, 6
     mov eax, 01111111b
     vxorps ymm6, ymm6, ymm6
+    vxorps ymm14, ymm14, ymm14
+    vxorps ymm13, ymm13, ymm13
+    vxorps ymm12, ymm12, ymm12
+    vxorps ymm11, ymm11, ymm11
+    vxorps ymm15, ymm15, ymm15
 
     vperm2i128 ymm11, ymm0, ymm11, 00110000b
     vperm2i128 ymm12, ymm1, ymm12, 00110000b
