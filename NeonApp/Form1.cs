@@ -10,7 +10,7 @@ namespace NeonApp
     public unsafe partial class Form1 : Form
     {
 
-        [DllImport(@"C:\Users\Maja\source\repos\NeonApp\x64\Debug\Asm.dll")]
+        [DllImport(@"C:\Users\Maja\source\repos\NeonApp\x64\Release\Asm.dll")]
         static extern void DetectEdges(byte* inputRowPrev, byte* inputRowCurrent, byte* inputRowNext,
         byte* outputPixels);
 
