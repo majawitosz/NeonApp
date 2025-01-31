@@ -194,6 +194,7 @@ namespace NeonApp
             asm_radioBtn.TabIndex = 20;
             asm_radioBtn.TabStop = true;
             asm_radioBtn.Text = "ASM x64 Library";
+            asm_radioBtn.Checked = true;
             asm_radioBtn.UseVisualStyleBackColor = true;
             asm_radioBtn.CheckedChanged += asm_radioBtn_CheckedChanged;
             // 
@@ -263,6 +264,7 @@ namespace NeonApp
             radioButton1.TabIndex = 21;
             radioButton1.TabStop = true;
             radioButton1.Text = "Pink";
+            radioButton1.Checked = true;
             radioButton1.TextImageRelation = TextImageRelation.ImageBeforeText;
             radioButton1.UseVisualStyleBackColor = false;
             radioButton1.CheckedChanged += RadioButton_CheckedChanged;
